@@ -1,0 +1,155 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      plan-json-artifact:
+        description: Name of the artifact containing tfplan.json files
+        type: string
+        required: true
+      tfsec-minimum-severity:
+        description: Minimum severity for tfsec findings to fail the check
+        type: string
+        default: "HIGH"
+      checkov-framework:
+        description: Checkov framework to use
+        type: string
+        default: "terraform_plan"
+      policy-path:
+        description: Path to OPA/Conftest policies directory
+        type: string
+        default: "policies/"
+    secrets:
+      github-token:
+        required: true
+    outputs:
+      tests-passed:
+        description: "true if all test stages passed"
+        value: ${{ jobs.test.outputs.tests-passed }}
+      sarif-artifact:
+        description: Name of artifact containing merged SARIF results
+        value: ${{ jobs.test.outputs.sarif-artifact }}
+
+jobs:
+  test:
+    name: Infrastructure Tests
+    runs-on: ubuntu-latest
+    outputs:
+      tests-passed: ${{ steps.result.outputs.passed }}
+      sarif-artifact: security-sarif-${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.plan-json-artifact }}
+          path: plan-outputs/
+
+      # ── Stage 1: tfsec static HCL scan ────────────────────────────────────
+      - name: Install tfsec
+        run: |
+          curl -sL "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64" \
+            -o /usr/local/bin/tfsec
+          chmod +x /usr/local/bin/tfsec
+          tfsec --version
+
+      - name: Run tfsec (static HCL)
+        id: tfsec
+        run: |
+          tfsec . \
+            --minimum-severity ${{ inputs.tfsec-minimum-severity }} \
+            --format sarif \
+            --out tfsec-results.sarif \
+            --no-color || true
+
+          # Count HIGH/CRITICAL findings and fail if any exist
+          CRITICAL=$(tfsec . --minimum-severity HIGH --format csv --no-color 2>/dev/null \
+            | grep -v "^rule_id" | wc -l || echo "0")
+          echo "critical-count=$CRITICAL" >> "$GITHUB_OUTPUT"
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "::error::tfsec found $CRITICAL HIGH/CRITICAL severity finding(s). Review tfsec output above."
+            exit 1
+          fi
+
+      # ── Stage 2: Checkov plan JSON scan ───────────────────────────────────
+      - name: Install Checkov
+        run: pip install checkov --quiet
+
+      - name: Run Checkov against plan JSON
+        id: checkov
+        run: |
+          for plan_file in plan-outputs/*.json; do
+            [ -f "$plan_file" ] || continue
+            checkov \
+              -f "$plan_file" \
+              --framework ${{ inputs.checkov-framework }} \
+              --compact \
+              --output sarif \
+              --output-file-path "checkov-$(basename $plan_file .json).sarif" \
+              --soft-fail-on MEDIUM \
+              || true
+          done
+
+          # Fail on HIGH/CRITICAL
+          for plan_file in plan-outputs/*.json; do
+            [ -f "$plan_file" ] || continue
+            HIGH_COUNT=$(checkov -f "$plan_file" --framework ${{ inputs.checkov-framework }} \
+              --compact --output json 2>/dev/null \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); \
+                print(len([r for r in d.get('results',{}).get('failed_checks',[]) \
+                if r.get('check_result',{}).get('severity','') in ['HIGH','CRITICAL']]))" \
+              2>/dev/null || echo "0")
+            if [ "$HIGH_COUNT" -gt 0 ]; then
+              echo "::error::Checkov found $HIGH_COUNT HIGH/CRITICAL finding(s) in $plan_file."
+              exit 1
+            fi
+          done
+
+      # ── Stage 3: OPA/Conftest custom policies ─────────────────────────────
+      - name: Install Conftest
+        run: |
+          curl -sL "https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin conftest
+          conftest --version
+
+      - name: Run Conftest custom policies
+        id: conftest
+        run: |
+          FAILED=0
+          for plan_file in plan-outputs/*.json; do
+            [ -f "$plan_file" ] || continue
+            conftest test "$plan_file" \
+              -p ${{ inputs.policy-path }} \
+              --all-namespaces \
+              --output github \
+              --no-color || FAILED=1
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Conftest policy violations found. See annotations above."
+            exit 1
+          fi
+
+      # ── Upload SARIF results ───────────────────────────────────────────────
+      - name: Merge and upload SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "."
+          category: infrastructure-security
+
+      - name: Archive SARIF artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-sarif-${{ github.run_id }}
+          path: "*.sarif"
+          retention-days: 30
+
+      - name: Set result
+        id: result
+        if: success()
+        run: echo "passed=true" >> "$GITHUB_OUTPUT"

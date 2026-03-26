@@ -1,0 +1,36 @@
+# OpenTofu / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+tfplan.binary
+tfplan.json
+*.tfplan
+
+# Terragrunt
+.terragrunt-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets / credentials
+*.pem
+*.key
+credentials.json
+.env
+.env.*
+!.env.example
+
+# CI artifacts
+*.sarif
+*.log
