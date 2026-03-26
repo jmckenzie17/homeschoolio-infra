@@ -48,20 +48,10 @@ In GitHub → Repository → Settings → Environments:
 
 For each GitHub environment, add the following secrets (use OIDC workload identity federation):
 
-**dev environment**:
-- `DEV_AZURE_CLIENT_ID` — Managed Identity / App Registration client ID
-- `DEV_AZURE_TENANT_ID` — Azure AD tenant ID
-- `DEV_AZURE_SUBSCRIPTION_ID` — Azure subscription ID
-
-**staging environment**:
-- `STAGING_AZURE_CLIENT_ID`
-- `STAGING_AZURE_TENANT_ID`
-- `STAGING_AZURE_SUBSCRIPTION_ID`
-
-**production environment**:
-- `PROD_AZURE_CLIENT_ID`
-- `PROD_AZURE_TENANT_ID`
-- `PROD_AZURE_SUBSCRIPTION_ID`
+Each environment uses the same secret names (scoped per environment, so no prefix needed):
+- `AZURE_CLIENT_ID` — Managed Identity / App Registration client ID
+- `AZURE_TENANT_ID` — Azure AD tenant ID
+- `AZURE_SUBSCRIPTION_ID` — Azure subscription ID
 
 To configure OIDC federation for each managed identity, add the following federated credential:
 - Issuer: `https://token.actions.githubusercontent.com`

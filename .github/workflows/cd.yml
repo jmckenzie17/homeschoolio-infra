@@ -23,9 +23,9 @@ jobs:
       target-environment: dev
     environment: dev
     secrets:
-      azure-client-id: ${{ secrets.DEV_AZURE_CLIENT_ID }}
-      azure-tenant-id: ${{ secrets.DEV_AZURE_TENANT_ID }}
-      azure-subscription-id: ${{ secrets.DEV_AZURE_SUBSCRIPTION_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
   staging-apply:
@@ -40,9 +40,9 @@ jobs:
       target-environment: staging
     environment: staging
     secrets:
-      azure-client-id: ${{ secrets.STAGING_AZURE_CLIENT_ID }}
-      azure-tenant-id: ${{ secrets.STAGING_AZURE_TENANT_ID }}
-      azure-subscription-id: ${{ secrets.STAGING_AZURE_SUBSCRIPTION_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
   production-apply:
@@ -57,7 +57,7 @@ jobs:
       target-environment: production
     environment: production
     secrets:
-      azure-client-id: ${{ secrets.PROD_AZURE_CLIENT_ID }}
-      azure-tenant-id: ${{ secrets.PROD_AZURE_TENANT_ID }}
-      azure-subscription-id: ${{ secrets.PROD_AZURE_SUBSCRIPTION_ID }}
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
