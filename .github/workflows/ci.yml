@@ -13,7 +13,7 @@ concurrency:
 
 # Shared workflow version — bump this single value to upgrade all CI stages.
 env:
-  SHARED_WORKFLOWS_VERSION: v1.0.1
+  SHARED_WORKFLOWS_VERSION: v1.1.0
 
 jobs:
   validate:
@@ -39,6 +39,16 @@ jobs:
       environments: "dev,staging,production"
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
+      backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
+
+  cost:
+    name: Cost Estimate
+    needs: plan
+    if: github.event_name == 'pull_request'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/cost.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      infracost-api-key: ${{ secrets.INFRACOST_API_KEY }}
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   destructive-op-gate:

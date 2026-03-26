@@ -167,7 +167,7 @@ no other changes to this repo.
 
 - [x] T032 [P] Update `CHANGELOG.md` with a `## [1.0.0]` entry documenting the pipeline release, shared workflow versions used, and link to `jmckenzie17/homeschoolio-shared-actions` tag
 - [x] T033 [P] Verify all Azure infrastructure referenced by the pipeline (state storage accounts, Key Vault) carries required tags (`Project`, `Environment`, `ManagedBy = "opentofu"`, `Owner`) — add or extend `policies/tags.rego` if any resource types are not covered
-- [ ] T034 Add Infracost workflow to `jmckenzie17/homeschoolio-shared-actions` as `cost.yml` (`workflow_call`), post cost delta as PR comment; update `ci.yml` to call it; satisfies constitution Principle VI deferred item; bump shared-actions tag to `v1.1.0` and update `SHARED_WORKFLOWS_VERSION`
+- [x] T034 Add Infracost workflow to `jmckenzie17/homeschoolio-shared-actions` as `cost.yml` (`workflow_call`), post cost delta as PR comment; update `ci.yml` to call it; satisfies constitution Principle VI deferred item; bump shared-actions tag to `v1.1.0` and update `SHARED_WORKFLOWS_VERSION`
 - [x] T035 [P] Update `specs/001-terraform-cicd-pipelines/checklists/requirements.md` — mark all items complete after end-to-end quickstart validation
 - [ ] T036 Run full `specs/001-terraform-cicd-pipelines/quickstart.md` validation checklist end-to-end; confirm all acceptance criteria pass
 

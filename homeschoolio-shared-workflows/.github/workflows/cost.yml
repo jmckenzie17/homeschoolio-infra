@@ -1,0 +1,103 @@
+name: Cost
+
+on:
+  workflow_call:
+    inputs:
+      opentofu-version:
+        description: OpenTofu CLI version to install
+        type: string
+        default: "1.6.2"
+      terragrunt-version:
+        description: Terragrunt CLI version to install
+        type: string
+        default: "0.56.3"
+      environments:
+        description: Comma-separated list of environment names to consider
+        type: string
+        default: "dev,staging,production"
+    secrets:
+      github-token:
+        required: true
+      infracost-api-key:
+        required: true
+      backend-credentials:
+        required: false
+    outputs:
+      cost-estimate-posted:
+        description: "true if cost delta was posted as a PR comment"
+        value: ${{ jobs.cost.outputs.cost-estimate-posted }}
+
+jobs:
+  cost:
+    name: Infracost Cost Estimate
+    runs-on: ubuntu-latest
+    outputs:
+      cost-estimate-posted: ${{ steps.post.outputs.posted }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ inputs.opentofu-version }}
+
+      - name: Install Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${{ inputs.terragrunt-version }}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.infracost-api-key }}
+
+      - name: Generate Infracost cost estimate (baseline from main)
+        run: |
+          git checkout main
+          infracost breakdown \
+            --path . \
+            --terraform-init-flags="-upgrade" \
+            --format json \
+            --out-file /tmp/infracost-base.json
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_CLIENT_ID: ${{ secrets.backend-credentials }}
+
+      - name: Generate Infracost cost estimate (PR changes)
+        run: |
+          git checkout ${{ github.sha }}
+          infracost breakdown \
+            --path . \
+            --terraform-init-flags="-upgrade" \
+            --format json \
+            --out-file /tmp/infracost-head.json
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_CLIENT_ID: ${{ secrets.backend-credentials }}
+
+      - name: Generate cost diff
+        run: |
+          infracost diff \
+            --path /tmp/infracost-head.json \
+            --compare-to /tmp/infracost-base.json \
+            --format json \
+            --out-file /tmp/infracost-diff.json
+
+      - name: Post cost delta as PR comment
+        id: post
+        if: github.event_name == 'pull_request'
+        uses: infracost/actions/comment@v1
+        with:
+          path: /tmp/infracost-diff.json
+          behavior: update
+          github-token: ${{ secrets.github-token }}
+
+      - name: Set result
+        id: result
+        if: success()
+        run: echo "posted=true" >> "$GITHUB_OUTPUT"
