@@ -1,0 +1,185 @@
+name: Plan
+
+on:
+  workflow_call:
+    inputs:
+      environments:
+        description: Comma-separated list of environment names to consider
+        type: string
+        default: "dev,staging,production"
+      opentofu-version:
+        description: OpenTofu CLI version to install
+        type: string
+        default: "1.6.2"
+      terragrunt-version:
+        description: Terragrunt CLI version to install
+        type: string
+        default: "0.56.3"
+    secrets:
+      github-token:
+        required: true
+      backend-credentials:
+        required: false
+    outputs:
+      affected-roots:
+        description: Comma-separated paths of changed environment roots
+        value: ${{ jobs.plan.outputs.affected-roots }}
+      has-destructive-ops:
+        description: "true if any plan contains resource deletions or replacements"
+        value: ${{ jobs.plan.outputs.has-destructive-ops }}
+      plan-artifact:
+        description: Artifact name containing plan JSON files per root
+        value: ${{ jobs.plan.outputs.plan-artifact }}
+
+jobs:
+  plan:
+    name: Terragrunt Plan
+    runs-on: ubuntu-latest
+    outputs:
+      affected-roots: ${{ steps.detect.outputs.roots }}
+      has-destructive-ops: ${{ steps.analyze.outputs.destructive }}
+      plan-artifact: tfplan-json-${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ inputs.opentofu-version }}
+
+      - name: Install Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${{ inputs.terragrunt-version }}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Cache OpenTofu providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: tofu-providers-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: tofu-providers-${{ runner.os }}-
+
+      - name: Detect changed environment roots
+        id: detect
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            environments/**/*.hcl
+            modules/**/*.tf
+
+      - name: Compute affected roots
+        id: roots
+        run: |
+          ALL_CHANGED="${{ steps.detect.outputs.all_changed_files }}"
+          ROOTS=""
+          for f in $ALL_CHANGED; do
+            ROOT=$(echo "$f" | grep -oE '^environments/[^/]+/[^/]+' || true)
+            if [ -n "$ROOT" ] && [ -d "$ROOT" ]; then
+              ROOTS="$ROOTS $ROOT"
+            fi
+          done
+          ROOTS=$(echo "$ROOTS" | tr ' ' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')
+          echo "roots=$ROOTS" >> "$GITHUB_OUTPUT"
+          echo "Affected roots: $ROOTS"
+
+      - name: Initialise and plan affected roots
+        id: plan
+        run: |
+          mkdir -p plan-outputs
+          IFS=',' read -ra ROOTS <<< "${{ steps.roots.outputs.roots }}"
+          for root in "${ROOTS[@]}"; do
+            root="${root// /}"
+            [ -z "$root" ] && continue
+            echo "=== Planning $root ==="
+            (
+              cd "$root"
+              terragrunt init -upgrade -no-color
+              terragrunt plan -out=tfplan.binary -no-color
+              terragrunt show -json tfplan.binary > tfplan.json
+              cp tfplan.json "$GITHUB_WORKSPACE/plan-outputs/$(echo $root | tr '/' '-').json"
+            )
+          done
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          ARM_USE_OIDC: "true"
+          ARM_CLIENT_ID: ${{ secrets.backend-credentials }}
+
+      - name: Analyze plans for destructive operations
+        id: analyze
+        run: |
+          DESTRUCTIVE=false
+          SUMMARY=""
+          for plan_file in plan-outputs/*.json; do
+            [ -f "$plan_file" ] || continue
+            ENV_NAME=$(basename "$plan_file" .json)
+            ADD=$(python3 -c "import json,sys; d=json.load(open('$plan_file')); \
+              print(len([r for r in d.get('resource_changes',[]) \
+              if 'create' in r.get('change',{}).get('actions',[])]))" 2>/dev/null || echo 0)
+            CHANGE=$(python3 -c "import json,sys; d=json.load(open('$plan_file')); \
+              print(len([r for r in d.get('resource_changes',[]) \
+              if 'update' in r.get('change',{}).get('actions',[])]))" 2>/dev/null || echo 0)
+            DESTROY=$(python3 -c "import json,sys; d=json.load(open('$plan_file')); \
+              print(len([r for r in d.get('resource_changes',[]) \
+              if 'delete' in r.get('change',{}).get('actions',[]) \
+              or r.get('change',{}).get('actions') == ['delete','create']]))" 2>/dev/null || echo 0)
+            SUMMARY="$SUMMARY\n| $ENV_NAME | +$ADD ~$CHANGE -$DESTROY |"
+            if [ "$DESTROY" -gt 0 ]; then
+              DESTRUCTIVE=true
+              echo "::warning::$ENV_NAME plan contains $DESTROY destructive operation(s)"
+            fi
+          done
+          echo "destructive=$DESTRUCTIVE" >> "$GITHUB_OUTPUT"
+          # Write plan summary to job summary
+          echo "## Plan Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Root | +add ~change -destroy |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|----------------------|" >> "$GITHUB_STEP_SUMMARY"
+          printf "$SUMMARY\n" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post plan summary as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.github-token }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const planDir = 'plan-outputs';
+            let body = '## 🗺 Terragrunt Plan Results\n\n';
+            body += '| Root | Changes |\n|------|--------|\n';
+            if (fs.existsSync(planDir)) {
+              for (const f of fs.readdirSync(planDir)) {
+                if (!f.endsWith('.json')) continue;
+                const plan = JSON.parse(fs.readFileSync(path.join(planDir, f)));
+                const changes = (plan.resource_changes || []);
+                const add = changes.filter(r => r.change?.actions?.includes('create')).length;
+                const chg = changes.filter(r => r.change?.actions?.includes('update')).length;
+                const del = changes.filter(r =>
+                  r.change?.actions?.includes('delete') ||
+                  JSON.stringify(r.change?.actions) === '["delete","create"]'
+                ).length;
+                const destructive = del > 0 ? ' ⚠️ DESTRUCTIVE' : '';
+                body += `| ${f.replace('.json','')} | +${add} ~${chg} -${del}${destructive} |\n`;
+              }
+            }
+            const destructive = '${{ steps.analyze.outputs.destructive }}' === 'true';
+            if (destructive) {
+              body += '\n> ⚠️ **This plan contains destructive operations.** The PR author MUST add the following acknowledgment to the PR description before merge will be allowed:\n>\n> `- [x] I acknowledge destructive operations in this plan`\n';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Upload plan JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-json-${{ github.run_id }}
+          path: plan-outputs/
+          retention-days: 7

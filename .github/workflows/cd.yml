@@ -1,0 +1,63 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target-environment:
+        description: Environment to promote to (staging or production)
+        required: true
+        type: choice
+        options: [staging, production]
+
+env:
+  SHARED_WORKFLOWS_VERSION: v1.0.0
+
+jobs:
+  dev-apply:
+    name: Apply to dev
+    if: github.event_name == 'push'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    with:
+      target-environment: dev
+    environment: dev
+    secrets:
+      azure-client-id: ${{ secrets.DEV_AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.DEV_AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.DEV_AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  staging-apply:
+    name: Apply to staging
+    needs: dev-apply
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
+      (needs.dev-apply.result == 'success')
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    with:
+      target-environment: staging
+    environment: staging
+    secrets:
+      azure-client-id: ${{ secrets.STAGING_AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.STAGING_AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.STAGING_AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  production-apply:
+    name: Apply to production
+    needs: staging-apply
+    if: |
+      always() &&
+      needs.staging-apply.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    with:
+      target-environment: production
+    environment: production
+    secrets:
+      azure-client-id: ${{ secrets.PROD_AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.PROD_AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.PROD_AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}

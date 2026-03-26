@@ -1,0 +1,74 @@
+name: Validate
+
+on:
+  workflow_call:
+    inputs:
+      opentofu-version:
+        description: OpenTofu CLI version to install
+        type: string
+        default: "1.6.2"
+      terragrunt-version:
+        description: Terragrunt CLI version to install
+        type: string
+        default: "0.56.3"
+      working-directory:
+        description: Repository root; defaults to repo root
+        type: string
+        default: "."
+    secrets:
+      backend-credentials:
+        description: Azure credentials for backend init (optional)
+        required: false
+    outputs:
+      validation-passed:
+        description: "true if all roots passed validation"
+        value: ${{ jobs.validate.outputs.validation-passed }}
+
+jobs:
+  validate:
+    name: Validate OpenTofu/Terragrunt
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    outputs:
+      validation-passed: ${{ steps.result.outputs.passed }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ inputs.opentofu-version }}
+
+      - name: Install Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${{ inputs.terragrunt-version }}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+
+      - name: Cache OpenTofu providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: tofu-providers-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: tofu-providers-${{ runner.os }}-
+
+      - name: Check HCL formatting
+        run: terragrunt run-all fmt --check --no-color
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+
+      - name: Validate all roots
+        run: terragrunt run-all validate --no-color
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          ARM_CLIENT_ID: ${{ secrets.backend-credentials }}
+
+      - name: Set result
+        id: result
+        if: success()
+        run: echo "passed=true" >> "$GITHUB_OUTPUT"

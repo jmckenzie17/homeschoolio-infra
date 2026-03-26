@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Shared workflow version — bump this single value to upgrade all CI stages.
+env:
+  SHARED_WORKFLOWS_VERSION: v1.0.0
+
+jobs:
+  validate:
+    name: Validate
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    secrets:
+      backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
+
+  test:
+    name: Test
+    needs: validate
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    with:
+      plan-json-artifact: tfplan-json-${{ github.run_id }}
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  plan:
+    name: Plan
+    needs: validate
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    with:
+      environments: "dev,staging,production"
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
+
+  destructive-op-gate:
+    name: Destructive Operation Gate
+    needs: plan
+    runs-on: ubuntu-latest
+    if: needs.plan.outputs.has-destructive-ops == 'true' && github.event_name == 'pull_request'
+    steps:
+      - name: Check for destructive-op acknowledgment in PR body
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const body = pr.data.body || '';
+            const acknowledged = body.includes('- [x] I acknowledge destructive operations in this plan');
+            if (!acknowledged) {
+              core.setFailed(
+                'This plan contains destructive operations. Add the following line to your PR description and check the box:\n\n' +
+                '- [x] I acknowledge destructive operations in this plan'
+              );
+            }
