@@ -13,7 +13,7 @@ concurrency:
 
 # Shared workflow version — bump this single value to upgrade all CI stages.
 env:
-  SHARED_WORKFLOWS_VERSION: v1.0.0
+  SHARED_WORKFLOWS_VERSION: v1.0.1
 
 jobs:
   validate:

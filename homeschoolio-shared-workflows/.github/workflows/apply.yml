@@ -33,6 +33,7 @@ jobs:
   apply:
     name: Apply to ${{ inputs.target-environment }}
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target-environment }}
     outputs:
       applied-sha: ${{ steps.apply.outputs.sha }}
 

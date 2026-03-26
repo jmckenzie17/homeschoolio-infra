@@ -1,8 +1,8 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       target-environment:
@@ -12,16 +12,15 @@ on:
         options: [staging, production]
 
 env:
-  SHARED_WORKFLOWS_VERSION: v1.0.0
+  SHARED_WORKFLOWS_VERSION: v1.0.1
 
 jobs:
   dev-apply:
     name: Apply to dev
-    if: github.event_name == 'push'
+    if: github.event_name == 'release'
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
     with:
       target-environment: dev
-    environment: dev
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -38,7 +37,6 @@ jobs:
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
     with:
       target-environment: staging
-    environment: staging
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -55,7 +53,6 @@ jobs:
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
     with:
       target-environment: production
-    environment: production
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
