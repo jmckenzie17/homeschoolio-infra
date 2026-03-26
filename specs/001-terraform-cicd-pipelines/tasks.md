@@ -96,24 +96,26 @@ missing tag. Fix the tag and verify the check passes.
 
 ---
 
-## Phase 5: User Story 3 — Merge Promotes Infrastructure Through Environments (Priority: P2)
+## Phase 5: User Story 3 — Release Promotes Infrastructure Through Environments (Priority: P2)
 
-**Goal**: Merging to `main` auto-applies to `dev`; staging and production promotion
+**Goal**: When a GitHub release is published (triggered by qualifying conventional commits
+merged to `main`), the CD pipeline auto-applies to `dev`; staging and production promotion
 are available via manual trigger with GitHub environment protection gates.
 
-**Independent Test**: Merge a PR that passed CI; verify `dev-apply` job runs
-automatically within 5 minutes. Trigger staging promotion; verify it runs only after
-`dev` succeeds. Trigger production promotion; verify the GitHub environment gate pauses
-for reviewer approval before applying.
+**Independent Test**: Merge a `feat:` commit; verify the release workflow creates a GitHub
+release, the `dev-apply` job triggers on that release event within 5 minutes. Trigger staging
+promotion; verify it runs only after `dev` succeeds. Trigger production promotion; verify the
+GitHub environment gate (defined in `apply.yml`) pauses for reviewer approval before applying.
 
 ### Implementation for User Story 3
 
 - [x] T022 [US3] Configure three GitHub environments in repository Settings → Environments: `dev` (no protection), `staging` (no protection), `production` (required reviewers: 1+, restrict deployment branch to `main`); document steps in `specs/001-terraform-cicd-pipelines/quickstart.md`
-- [x] T023 [US3] Add environment-scoped Azure OIDC secrets in GitHub Settings for each environment: `DEV_AZURE_CLIENT_ID`, `DEV_AZURE_TENANT_ID`, `DEV_AZURE_SUBSCRIPTION_ID`; `STAGING_*`; `PROD_*`; document in `specs/001-terraform-cicd-pipelines/quickstart.md`
-- [x] T024 [US3] Create `.github/workflows/cd.yml` — caller workflow: `dev-apply` job (environment: `dev`, triggered on `push` to `main`) calls `apply.yml`; `staging-apply` (environment: `staging`, `needs: dev-apply`, `workflow_dispatch`) calls `apply.yml`; `production-apply` (environment: `production`, `needs: staging-apply`, `workflow_dispatch`) calls `apply.yml` — each passes Azure OIDC secrets from environment store
-- [x] T025 [US3] Update `specs/001-terraform-cicd-pipelines/quickstart.md` — add CD validation steps: verify dev auto-apply after merge, how to trigger staging/production via `workflow_dispatch`, how to approve the production environment gate
+- [x] T023 [US3] Add environment-scoped Azure OIDC secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) scoped per environment (no prefix needed) in GitHub Settings; document in `specs/001-terraform-cicd-pipelines/quickstart.md`
+- [x] T024 [US3] Create `.github/workflows/cd.yml` — caller workflow triggered on `release: published`; `dev-apply` job calls `apply.yml`; `staging-apply` (`needs: dev-apply`, `workflow_dispatch`) calls `apply.yml`; `production-apply` (`needs: staging-apply`, `workflow_dispatch`) calls `apply.yml` — each passes unprefixed Azure OIDC secrets; `environment:` gate declared inside `apply.yml` (not on caller)
+- [x] T024a [US3] Update `homeschoolio-shared-workflows/.github/workflows/apply.yml` — add `environment: ${{ inputs.target-environment }}` on the job definition; push updated workflow to `jmckenzie17/homeschoolio-shared-actions` and tag `v1.0.1`; bump `SHARED_WORKFLOWS_VERSION` to `v1.0.1` in `ci.yml` and `cd.yml`
+- [x] T025 [US3] Update `specs/001-terraform-cicd-pipelines/quickstart.md` — add CD validation steps: verify dev auto-apply after release event, how to trigger staging/production via `workflow_dispatch`, how to approve the production environment gate
 
-**Checkpoint**: US3 complete — full dev → staging → production promotion chain with environment gates.
+**Checkpoint**: US3 complete — full dev → staging → production promotion chain with environment gates triggered by release event.
 
 ---
 

@@ -102,16 +102,17 @@ To configure OIDC federation for each managed identity, add the following federa
 
 ## US3 Validation: Environment Promotion Chain
 
-1. Merge a PR that passed all CI checks
-2. Verify the **Apply to dev** job triggers automatically within 5 minutes
-3. To trigger staging promotion:
+1. Merge a PR with a qualifying conventional commit (e.g., `feat:` or `fix:`)
+2. Verify the **release** workflow runs and a GitHub release is published
+3. Verify the **Apply to dev** job triggers automatically on the release event within 5 minutes
+5. To trigger staging promotion:
    - Go to Actions → CD workflow → click **Run workflow**
    - Select `target-environment: staging`
    - Verify `staging-apply` job runs after `dev-apply` succeeds
-4. To trigger production promotion:
+6. To trigger production promotion:
    - Go to Actions → CD workflow → click **Run workflow**
    - Select `target-environment: production`
-   - Verify the pipeline pauses at the `production` environment protection gate
+   - Verify the pipeline pauses at the `production` environment protection gate (enforced inside `apply.yml`)
    - Approve the deployment via the Actions UI
    - Verify `production-apply` runs only after approval
 
