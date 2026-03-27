@@ -1,9 +1,11 @@
 package main
 
+import rego.v1
+
 # Required tags on every taggable Azure resource per constitution Infrastructure Standards.
 required_tags := {"Project", "Environment", "ManagedBy", "Owner"}
 
-deny[msg] {
+deny contains msg if {
   resource := input.resource_changes[_]
 
   # Only evaluate resources being created or updated (not no-op or deleted)

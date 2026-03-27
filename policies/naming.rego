@@ -1,5 +1,7 @@
 package main
 
+import rego.v1
+
 # Enforce resource naming convention: {project}-{environment}-{resource-type}-{descriptor}
 # Pattern: one or more lowercase alphanumeric segments separated by hyphens, minimum 4 segments.
 # Example: homeschoolio-prod-nsg-web
@@ -21,7 +23,7 @@ enforced_types := {
   "azurerm_function_app",
 }
 
-deny[msg] {
+deny contains msg if {
   resource := input.resource_changes[_]
 
   action := resource.change.actions[_]
