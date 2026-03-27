@@ -24,7 +24,7 @@ jobs:
 
   test:
     name: Test
-    needs: validate
+    needs: [validate, plan]
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.0
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
