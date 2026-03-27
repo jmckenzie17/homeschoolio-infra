@@ -111,7 +111,7 @@ GitHub environment gate (defined in `apply.yml`) pauses for reviewer approval be
 
 - [x] T022 [US3] Configure three GitHub environments in repository Settings → Environments: `dev` (no protection), `staging` (no protection), `production` (required reviewers: 1+, restrict deployment branch to `main`); document steps in `specs/001-terraform-cicd-pipelines/quickstart.md`
 - [x] T023 [US3] Add environment-scoped Azure OIDC secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) scoped per environment (no prefix needed) in GitHub Settings; document in `specs/001-terraform-cicd-pipelines/quickstart.md`
-- [x] T024 [US3] Create `.github/workflows/cd.yml` — caller workflow triggered on `release: published`; `dev-apply` job calls `apply.yml`; `staging-apply` (`needs: dev-apply`, `workflow_dispatch`) calls `apply.yml`; `production-apply` (`needs: staging-apply`, `workflow_dispatch`) calls `apply.yml` — each passes unprefixed Azure OIDC secrets; `environment:` gate declared inside `apply.yml` (not on caller)
+- [x] T024 [US3] Create `.github/workflows/cd.yml` — caller workflow triggered on `release: published` with `workflow_dispatch` (staging/production); concurrency group `cd-deployment` with `cancel-in-progress: false`; `dev-apply` job with tag-filter condition `startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-') && github.event.release.prerelease == false`; `staging-apply` and `production-apply` wired via `workflow_dispatch`; each job calls `apply.yml@v1.3.2` with Azure OIDC secrets; `environment:` gate declared inside `apply.yml`
 - [x] T024a [US3] Update `homeschoolio-shared-workflows/.github/workflows/apply.yml` — add `environment: ${{ inputs.target-environment }}` on the job definition; push updated workflow to `jmckenzie17/homeschoolio-shared-actions` and tag `v1.0.1`; bump `SHARED_WORKFLOWS_VERSION` to `v1.0.1` in `ci.yml` and `cd.yml`
 - [x] T025 [US3] Update `specs/001-terraform-cicd-pipelines/quickstart.md` — add CD validation steps: verify dev auto-apply after release event, how to trigger staging/production via `workflow_dispatch`, how to approve the production environment gate
 
@@ -133,7 +133,7 @@ tag `v{NEXT_MINOR}` and updated `v{MAJOR}` pointer appear within 2 minutes. Merg
 ### Implementation for User Story 4
 
 - [x] T026 [US4] Add `CONTRIBUTING.md` at repo root documenting conventional commit format: `feat:` (minor bump), `fix:` (patch bump), `chore:`/`docs:` (no release), `BREAKING CHANGE` footer (major bump); include examples for infrastructure changes
-- [x] T027 [US4] Create `.github/workflows/release.yml` — caller workflow triggered on `push` to `main`; calls `jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml@main` with `release-branch: main`, `tag-prefix: "v"`, `secrets: inherit`
+- [x] T027 [US4] Create `.github/workflows/release.yml` — caller workflow triggered on `push` to `main`; calls `jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml@v1.3.2` with `release-branch: main`, `tag-prefix: "v"`, `secrets: inherit` (must be pinned semver tag per FR-011 and constitution Principle III)
 - [x] T028 [US4] Update `specs/001-terraform-cicd-pipelines/quickstart.md` — add semver validation steps: merge a `feat:` commit, verify tag created; merge a `chore:` commit, verify no tag; reference a tag from a downstream `terragrunt.hcl` source
 
 **Checkpoint**: US4 complete — semantic version tags created automatically by conventional commits.
@@ -154,10 +154,26 @@ no other changes to this repo.
 ### Implementation for User Story 5
 
 - [x] T029 [US5] Audit `.github/workflows/ci.yml`, `cd.yml`, and `release.yml`: confirm all substantive logic is in shared workflows; only `uses:`, `with:`, `secrets:`, `needs:`, `environment:`, and `env:` declarations are permitted locally; fix any inline logic found
-- [x] T030 [US5] Verify `SHARED_WORKFLOWS_VERSION` env var is defined at workflow level in `ci.yml` and `cd.yml` so all `uses:` references pin to the same tag in one place; confirm `release.yml` uses `@main` (intentional — `semver-release.yml` is in the same shared-actions repo and uses its own release process)
+- [x] T030 [US5] Verify `SHARED_WORKFLOWS_VERSION` env var is defined at workflow level in `ci.yml` and `cd.yml` so all `uses:` references pin to the same tag in one place; confirm `release.yml` pins to a semver tag (e.g., `@v1.3.2`) — floating `@main` is forbidden per FR-011 and constitution Principle III
 - [x] T031 [US5] Update `specs/001-terraform-cicd-pipelines/quickstart.md` — document shared workflow upgrade process: check `jmckenzie17/homeschoolio-shared-actions` releases, open PR bumping `SHARED_WORKFLOWS_VERSION`, verify CI passes, merge
 
 **Checkpoint**: All 5 user stories complete — full CI/CD pipeline operational.
+
+---
+
+## Phase 7b: CD Remediation — Release Trigger Gaps (Plan 2026-03-27)
+
+**Purpose**: Three gaps identified in planning that are NOT yet applied to the existing
+`.github/workflows/` files. These must be completed before the CD pipeline is production-ready.
+
+**⚠️ CRITICAL**: These tasks remediate a constitution Principle III violation and two missing
+safety controls. Complete before any production release event is expected.
+
+- [x] T042 [US3] Update `.github/workflows/cd.yml` — add `concurrency: { group: cd-deployment, cancel-in-progress: false }` at workflow level (FR-007a); prevents parallel applies racing on Azure Blob state locks
+- [x] T043 [P] [US3] Update `.github/workflows/cd.yml` — add tag-filter `if:` condition to `dev-apply` job: `github.event_name == 'release' && startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-') && github.event.release.prerelease == false` (FR-007); blocks pre-release and draft releases from triggering CD
+- [x] T044 [P] [US4] Update `.github/workflows/release.yml` — change `semver-release.yml@main` to `semver-release.yml@v1.3.2`; also update the pinned-version comment at top of file (FR-011, constitution Principle III); resolves the one Complexity Tracking violation in plan.md
+
+**Checkpoint**: CD pipeline fully compliant with spec and constitution. All three gaps closed.
 
 ---
 
@@ -189,7 +205,8 @@ no other changes to this repo.
 - **US3 (Phase 5)**: T022–T023 can start after Phase 2; T024 depends on US1 (`ci.yml` must exist)
 - **US4 (Phase 6)**: Depends on Phase 2; T027 already done; T026/T028 independent
 - **US5 (Phase 7)**: Depends on US1–US4 all complete (audit requires all workflows exist)
-- **Polish (Phase 8)**: Depends on US1–US5 complete
+- **CD Remediation (Phase 7b)**: T042 depends on existing `cd.yml` (US3 complete); T043–T044 are independent of each other [P]
+- **Polish (Phase 8)**: Depends on US1–US5 and Phase 7b complete
 
 ### User Story Dependencies
 
@@ -206,6 +223,7 @@ no other changes to this repo.
 - T016 (US1) + T019 (US2) + T022–T023 (US3 config): parallel after Foundational
 - T026 + T027 (US4): parallel
 - T032 + T033 + T035 (Polish): parallel
+- T043 + T044 (Phase 7b): parallel after T042
 
 ---
 
@@ -250,6 +268,6 @@ Task: "Create apply.yml in homeschoolio-shared-workflows/"      # T014
 - Shared-actions repo: `jmckenzie17/homeschoolio-shared-actions` (confirmed from clarification)
 - `semver-release.yml` already exists in shared-actions — no custom tag workflow needed
 - Caller workflows MUST remain thin (no inline logic per US5 / constitution Principle III)
-- `release.yml` pins to `@main` for `semver-release.yml` — intentional since that workflow manages its own releases in the shared-actions repo
+- `release.yml` MUST pin `semver-release.yml` to a semver tag (e.g., `@v1.3.2`) — floating `@main` is a constitution III violation (T044 remediates the existing file)
 - Azure credentials: use OIDC workload identity federation (not long-lived service principal secrets)
 - T015 is a manual step: push shared workflow files and tag `v1.0.0` on `jmckenzie17/homeschoolio-shared-actions`

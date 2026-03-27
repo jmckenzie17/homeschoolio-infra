@@ -13,13 +13,21 @@ on:
 
 # Shared workflow version — update the version in each uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.3.2
+# Current pinned version: v1.3.4
+
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
 
 jobs:
   dev-apply:
     name: Apply to dev
-    if: github.event_name == 'release'
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
+    if: |
+      github.event_name == 'release' &&
+      startsWith(github.ref_name, 'v') &&
+      !contains(github.ref_name, '-') &&
+      github.event.release.prerelease == false
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
     with:
       target-environment: dev
     secrets:
@@ -35,7 +43,7 @@ jobs:
       always() &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
       (needs.dev-apply.result == 'success')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
     with:
       target-environment: staging
     secrets:
@@ -51,7 +59,7 @@ jobs:
       always() &&
       needs.staging-apply.result == 'success' &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
     with:
       target-environment: production
     secrets:

@@ -16,6 +16,14 @@
 - Q: Which shared workflow handles module semantic versioning and release tagging? → A: `jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml` — uses semantic-release driven by conventional commits; outputs `release-created`, `tag-name`, `major-tag`
 - Q: What event triggers the CD pipeline? → A: GitHub release published event (not push to main); CD triggers when a semver release is created by the release workflow
 
+### Session 2026-03-27
+
+- Q: Should the CD workflow trigger on all published releases or only releases whose tag matches a specific pattern? → A: Only releases whose tag matches `v[0-9]+.[0-9]+.[0-9]+` (stable semver only; excludes pre-releases and manually created tags)
+- Q: Should the CD workflow trigger on draft releases or only published (non-draft) releases? → A: Only published (non-draft) releases
+- Q: How should the CD pipeline handle a second release published while a prior CD run is still in progress? → A: Queue — allow one active run; the next release waits until the current run completes (no cancel-in-progress)
+- Q: Should the CD pipeline apply all Terragrunt environment roots or only roots whose files changed in the release? → A: Apply all environment roots unconditionally on every release
+- Q: If `staging` promotion is never triggered before the next release fires, how should `dev` behave? → A: New release overwrites `dev` again unconditionally; no expiry, staleness tracking, or blocking of subsequent CD runs
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Engineer Opens a PR Against an Infrastructure Change (Priority: P1)
@@ -163,6 +171,9 @@ files.
   MUST still complete successfully and report the no-op status clearly.
 - What happens when an apply fails mid-way through a complex change? The pipeline MUST
   stop immediately, not attempt automatic rollback, and report the partial state clearly.
+- What happens when a second release is published while a CD run is active? The second
+  run MUST be queued (not cancelled) and execute after the active run completes; no
+  release event MUST be silently dropped.
 - What happens when the shared workflow repository is unavailable? The pipeline MUST
   fail with a clear error identifying the missing dependency.
 - What happens when a PR includes multiple module version bumps? Each module MUST be
@@ -187,9 +198,20 @@ files.
   tests, plan) fails.
 - **FR-006**: The CI pipeline MUST highlight destructive operations in the plan output
   and require the PR author to explicitly acknowledge them before the merge gate clears.
-- **FR-007**: The CD pipeline MUST trigger automatically on a GitHub release published
-  event and apply changes to `dev`, preceded by a passing plan. The release is created
-  by the release workflow when qualifying conventional commits are merged to `main`.
+- **FR-007**: The CD pipeline MUST trigger automatically on a GitHub `release: published`
+  event (non-draft only) whose tag matches the pattern `v[0-9]+.[0-9]+.[0-9]+` (stable
+  semver only; draft releases, pre-release tags, and manually created tags MUST NOT
+  trigger the CD pipeline) and apply changes to `dev`, preceded by a passing plan. The
+  release is created by the release workflow when qualifying conventional commits are
+  merged to `main`.
+- **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against all
+  Terragrunt environment roots unconditionally (no changed-files filtering); this
+  ensures consistent environment state regardless of which files were modified in the
+  release.
+- **FR-007a**: The CD pipeline MUST use a GitHub Actions concurrency group scoped to the
+  CD workflow with `cancel-in-progress: false` so that a second release published while
+  a prior CD run is active is queued and executed after the active run completes; no
+  release MUST be silently dropped.
 - **FR-008**: The CD pipeline MUST require a manual trigger for `staging` promotion and
   MUST NOT apply to `staging` until the `dev` apply succeeds.
 - **FR-009**: The CD pipeline MUST require a manual trigger with explicit approval for
@@ -262,6 +284,9 @@ files.
   runtime; secret management is out of scope.
 - Destructive-operation acknowledgment is implemented as a PR description checkbox or
   label convention.
+- Each GitHub release represents the full desired state of the repository; a new release
+  supersedes any pending unapplied state in `dev`. There is no expiry, staleness alert,
+  or gate blocking a new CD run if a prior `staging` promotion was never triggered.
 - Semantic versioning is driven by conventional commits (`feat:`, `fix:`,
   `BREAKING CHANGE`) parsed by `semantic-release` via the shared
   `jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml`

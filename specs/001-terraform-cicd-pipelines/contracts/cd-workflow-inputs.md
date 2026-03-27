@@ -1,7 +1,7 @@
 # Contract: CD Workflow Inputs/Outputs
 
 **Workflow file**: `.github/workflows/cd.yml` (caller, in this repo)
-**Triggered by**: `push` to `main` (auto-apply dev); `workflow_dispatch` (staging/prod)
+**Triggered by**: `release: published` with tag matching `v[0-9]+.[0-9]+.[0-9]+` (non-draft, non-prerelease) → auto-applies to `dev`; `workflow_dispatch` (staging/prod manual promotion)
 
 ## Inputs (passed to shared workflows)
 
@@ -23,9 +23,34 @@
 
 ## GitHub Environment Mapping
 
+## Concurrency
+
+```yaml
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
+```
+
+One active CD run at a time. A second release published while one run is active is queued
+(GitHub limit: 1 pending per group). A third release supersedes the pending run.
+
+## Tag Filter (applied to `dev-apply` job)
+
+```yaml
+if: |
+  github.event_name == 'release' &&
+  startsWith(github.ref_name, 'v') &&
+  !contains(github.ref_name, '-') &&
+  github.event.release.prerelease == false
+```
+
+Pre-release tags (e.g., `v2.0.0-beta.1`) and draft releases MUST NOT trigger `dev-apply`.
+
+## GitHub Environment Mapping
+
 | Job | GitHub Environment | Protection Rules |
 |-----|-------------------|-----------------|
-| `dev-apply` | `dev` | None; triggers automatically on merge |
+| `dev-apply` | `dev` | None; triggers automatically on stable release event |
 | `staging-apply` | `staging` | None; triggered manually via `workflow_dispatch` |
 | `production-apply` | `production` | Required reviewers (1+ designated approvers) |
 
