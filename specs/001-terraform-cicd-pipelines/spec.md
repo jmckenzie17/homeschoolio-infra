@@ -27,7 +27,8 @@
 ### Session 2026-03-27 (correction)
 
 - Q: Should the CI pipeline also run on pushes to `main` (post-merge)? → A: No — CI runs on pull request events only; no post-merge run on `main`
-- Q: Why does the CD pipeline not trigger when a release is created? → A: GitHub Actions `release` event triggers are only evaluated from workflows on the default branch (`main`); the CD workflow must be merged to `main` before any release event can fire it
+- Q: Why does the CD pipeline not trigger when a release is created? → A: `GITHUB_TOKEN`-created events (including releases created by `semantic-release`) do not trigger downstream workflow runs — a GitHub Actions security restriction. The CD pipeline must use `workflow_run` on the Release workflow completing successfully instead of `on: release: published`
+- Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: `workflow_run` trigger on the Release workflow completing — no PAT required, works within GITHUB_TOKEN scope, standard GitHub-native chaining pattern
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -204,12 +205,11 @@ files.
   tests, plan) fails.
 - **FR-006**: The CI pipeline MUST highlight destructive operations in the plan output
   and require the PR author to explicitly acknowledge them before the merge gate clears.
-- **FR-007**: The CD pipeline MUST trigger automatically on a GitHub `release: published`
-  event (non-draft only) whose tag matches the pattern `v[0-9]+.[0-9]+.[0-9]+` (stable
-  semver only; draft releases, pre-release tags, and manually created tags MUST NOT
-  trigger the CD pipeline) and apply changes to `dev`, preceded by a passing plan. The
-  release is created by the release workflow when qualifying conventional commits are
-  merged to `main`.
+- **FR-007**: The CD pipeline MUST trigger automatically via `workflow_run` on successful
+  completion of the Release workflow (which runs on push to `main` and creates semver
+  releases via `semantic-release`). The `release: published` event MUST NOT be used as
+  the CD trigger because `GITHUB_TOKEN`-created releases do not fire downstream workflow
+  events. The CD pipeline applies changes to `dev` on each trigger.
 - **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against all
   Terragrunt environment roots unconditionally (no changed-files filtering); this
   ensures consistent environment state regardless of which files were modified in the
@@ -291,10 +291,10 @@ files.
   runtime; secret management is out of scope.
 - Destructive-operation acknowledgment is implemented as a PR description checkbox or
   label convention.
-- GitHub Actions evaluates `release` and other non-PR event triggers only from workflows
-  on the repository's default branch (`main`). The CD workflow MUST be merged to `main`
-  before any `release: published` event can trigger it; releases created while `cd.yml`
-  exists only on a feature branch will not trigger CD.
+- `GITHUB_TOKEN`-created events (including GitHub releases created by `semantic-release`
+  via `@semantic-release/github`) do NOT trigger downstream workflow runs. This is a
+  deliberate GitHub security restriction to prevent infinite loops. The CD pipeline
+  therefore uses `workflow_run` on the Release workflow rather than `on: release: published`.
 - Each GitHub release represents the full desired state of the repository; a new release
   supersedes any pending unapplied state in `dev`. There is no expiry, staleness alert,
   or gate blocking a new CD run if a prior `staging` promotion was never triggered.

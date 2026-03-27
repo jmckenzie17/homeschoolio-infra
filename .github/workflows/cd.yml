@@ -1,8 +1,10 @@
 name: CD
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       target-environment:
@@ -22,11 +24,9 @@ concurrency:
 jobs:
   dev-apply:
     name: Apply to dev
-    if: |
-      github.event_name == 'release' &&
-      startsWith(github.ref_name, 'v') &&
-      !contains(github.ref_name, '-') &&
-      github.event.release.prerelease == false
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
     with:
       target-environment: dev
