@@ -4,9 +4,7 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
-
+    
 permissions:
   id-token: write
   contents: read
