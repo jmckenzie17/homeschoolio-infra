@@ -103,8 +103,9 @@ To configure OIDC federation for each managed identity, add the following federa
 ## US3 Validation: Environment Promotion Chain
 
 1. Merge a PR with a qualifying conventional commit (e.g., `feat:` or `fix:`)
-2. Verify the **release** workflow runs and a GitHub release is published
+2. Verify the **release** workflow runs and a GitHub release is published with a stable semver tag (e.g., `v1.1.0`)
 3. Verify the **Apply to dev** job triggers automatically on the release event within 5 minutes
+   - To verify the tag filter works: manually create a GitHub release with a pre-release tag (e.g., `v1.2.0-beta.1`) or mark the release as a pre-release; confirm the CD `dev-apply` job is skipped (condition evaluates false)
 5. To trigger staging promotion:
    - Go to Actions → CD workflow → click **Run workflow**
    - Select `target-environment: staging`
@@ -163,7 +164,7 @@ To upgrade the pinned shared workflow version:
 
 ## Upgrading Shared Workflow Versions
 
-No workflow logic needs to be copied or re-implemented locally. The single-line
-`SHARED_WORKFLOWS_VERSION` env var in `ci.yml` and `cd.yml` controls all shared workflow
-references. `release.yml` pins to `@main` intentionally — the semver-release workflow manages
-its own releases in the shared-actions repo.
+No workflow logic needs to be copied or re-implemented locally. To upgrade, open a PR bumping the
+pinned version literal in every `uses:` line in `ci.yml`, `cd.yml`, and `release.yml` (e.g.,
+`@v1.3.2` → `@v1.4.0`). GitHub Actions does not support env vars in `uses:` fields; the version
+must be a literal string. A comment at the top of each workflow file tracks the current pinned version.

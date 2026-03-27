@@ -112,6 +112,43 @@ auditable release history. Eliminates the manual `version.tf` bump pattern entir
 
 ---
 
+## 5a. CD Workflow: Tag Pattern Filtering (Session 2026-03-27)
+
+**Decision**: Apply tag filter as a job-level `if:` condition on the `dev-apply` job:
+`startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-') && github.event.release.prerelease == false`
+
+**Rationale**: The `on.release` trigger in GitHub Actions does not support tag-name pattern filtering at the trigger level (unlike `on.push` which has `tags:/tags-ignore:`). Tag filtering must be implemented via `if:` on each job. Using both `!contains(github.ref_name, '-')` (blocks pre-release semver like `v2.0.0-beta.1`) and `github.event.release.prerelease == false` (checks GitHub's release metadata) provides belt-and-suspenders protection. This filter is applied only to `dev-apply` (the release-triggered job); `staging-apply` and `production-apply` are `workflow_dispatch` only and do not need it.
+
+**Alternatives considered**:
+- Trigger-level tag filter: not supported for `on.release` events; rejected.
+- Regex via external action: unnecessary complexity for a two-condition filter; rejected.
+
+---
+
+## 5b. CD Workflow: Concurrency Group (Session 2026-03-27)
+
+**Decision**: Add `concurrency: { group: cd-deployment, cancel-in-progress: false }` to `cd.yml`. The existing `cd.yml` has no concurrency block.
+
+**Rationale**: Without a concurrency group, two rapid release publishes can trigger parallel CD runs that race on Azure Blob state locks. A static group key (`cd-deployment`) ensures sequential execution. `cancel-in-progress: false` protects active applies from mid-run interruption. GitHub's hardcoded queue depth is 1 pending run per concurrency group — if a third release fires while one run is active and one is pending, the oldest pending run is replaced. This is safe: the newest release always represents the desired state.
+
+**Alternatives considered**:
+- `cancel-in-progress: true`: risks partial apply state corruption; rejected.
+- Dynamic key per `github.ref`: each release tag is unique, defeating the queue entirely; rejected.
+
+---
+
+## 5c. `release.yml` Shared Workflow Pin Fix (Session 2026-03-27)
+
+**Decision**: Change `release.yml` from `semver-release.yml@main` to `semver-release.yml@v1.3.2`.
+
+**Rationale**: `@main` is a mutable floating reference. Any push to `main` in the shared-actions repo silently changes the code executing the release workflow — a supply-chain risk and a violation of constitution Principle III (Immutable Versioning). Pinning to `@v1.3.2` (the version already in use by `ci.yml` and `cd.yml`) makes the reference immutable. No functional change; the shared workflow behavior is identical.
+
+**Alternatives considered**:
+- Pin to commit SHA: maximum security but reduces readability; deferred to a future security hardening pass.
+- Keep `@main`: violates constitution and spec FR-011; rejected.
+
+---
+
 ## 5. GitHub Environment Protection Rules
 
 **Decision**: Create three GitHub environments (`dev`, `staging`, `production`) via

@@ -15,10 +15,18 @@ on:
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
 # Current pinned version: v1.3.2
 
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
+
 jobs:
   dev-apply:
     name: Apply to dev
-    if: github.event_name == 'release'
+    if: |
+      github.event_name == 'release' &&
+      startsWith(github.ref_name, 'v') &&
+      !contains(github.ref_name, '-') &&
+      github.event.release.prerelease == false
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
     with:
       target-environment: dev
