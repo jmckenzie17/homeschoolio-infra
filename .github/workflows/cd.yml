@@ -19,7 +19,7 @@ jobs:
   dev-apply:
     name: Apply to dev
     if: github.event_name == 'release'
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.3
     with:
       target-environment: dev
     secrets:
@@ -35,7 +35,7 @@ jobs:
       always() &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
       (needs.dev-apply.result == 'success')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.3
     with:
       target-environment: staging
     secrets:
@@ -51,7 +51,7 @@ jobs:
       always() &&
       needs.staging-apply.result == 'success' &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.2.3
     with:
       target-environment: production
     secrets:
