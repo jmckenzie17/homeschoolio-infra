@@ -6,7 +6,7 @@ on:
 
 # Shared workflow version — update the version in the uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.3.2
+# Current pinned version: v1.3.4
 
 permissions:
   contents: write
@@ -14,7 +14,7 @@ permissions:
 jobs:
   semver-release:
     name: Semantic Version Release
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml@v1.3.2
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml@v1.3.4
     with:
       release-branch: main
       tag-prefix: "v"
