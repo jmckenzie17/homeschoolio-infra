@@ -7,8 +7,8 @@ locals {
   path_components = split("/", path_relative_to_include())
   environment     = local.path_components[1]
 
-  project        = "homeschoolio"
-  location       = "eastus"
+  project         = "homeschoolio"
+  location        = "eastus"
   storage_account = "homeschooliostfstate"
   resource_group  = "homeschoolio-shared-rg-tfstate"
 }
