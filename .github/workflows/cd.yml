@@ -1,8 +1,8 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       target-environment:
@@ -11,17 +11,17 @@ on:
         type: choice
         options: [staging, production]
 
-env:
-  SHARED_WORKFLOWS_VERSION: v1.0.0
+# Shared workflow version — update the version in each uses: line below to upgrade.
+# Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
+# Current pinned version: v1.3.2
 
 jobs:
   dev-apply:
     name: Apply to dev
-    if: github.event_name == 'push'
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    if: github.event_name == 'release'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
     with:
       target-environment: dev
-    environment: dev
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -35,10 +35,9 @@ jobs:
       always() &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
       (needs.dev-apply.result == 'success')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
     with:
       target-environment: staging
-    environment: staging
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -52,10 +51,9 @@ jobs:
       always() &&
       needs.staging-apply.result == 'success' &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.2
     with:
       target-environment: production
-    environment: production
     secrets:
       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}

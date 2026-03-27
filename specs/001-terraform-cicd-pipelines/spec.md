@@ -14,6 +14,7 @@
 - Q: What mechanism grants explicit approval for production promotion? → A: GitHub environment protection rules with required reviewers
 - Q: How are engineers notified of pipeline failures? → A: GitHub native only (failed check status + GitHub email notifications; no external channels)
 - Q: Which shared workflow handles module semantic versioning and release tagging? → A: `jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml` — uses semantic-release driven by conventional commits; outputs `release-created`, `tag-name`, `major-tag`
+- Q: What event triggers the CD pipeline? → A: GitHub release published event (not push to main); CD triggers when a semver release is created by the release workflow
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -73,20 +74,22 @@ the violation, and that fixing it causes CI to pass.
 
 ### User Story 3 - Engineer Merges to Main and Infrastructure Promotes Through Environments (Priority: P2)
 
-After CI passes and a PR is merged to `main`, the CD pipeline automatically applies
-the change to `dev`, and makes `staging` and `production` promotion available via
-manual trigger.
+After CI passes and a PR is merged to `main`, the release workflow creates a semver Git
+tag and GitHub release. The CD pipeline triggers on that release event and automatically
+applies to `dev`; `staging` and `production` promotion are available via manual trigger.
 
 **Why this priority**: Closes the loop from code review to live infrastructure. Builds
-on US1/US2 (CI must pass before merge is possible).
+on US1/US2 (CI must pass before merge is possible) and US4 (release event is the CD trigger).
 
-**Independent Test**: Merge a PR that passed CI; verify the CD pipeline applies to `dev`
-automatically, and that staging/production promotion triggers appear and work correctly.
+**Independent Test**: Merge a PR with a qualifying conventional commit; verify the release
+workflow creates a GitHub release, the CD pipeline triggers on that release event, and
+applies to `dev` automatically within 5 minutes.
 
 **Acceptance Scenarios**:
 
-1. **Given** a PR is merged to `main`, **When** the merge completes, **Then** the CD
-   pipeline automatically applies the change to `dev` within 5 minutes.
+1. **Given** a GitHub release is published (triggered by a qualifying conventional commit
+   merged to `main`), **When** the release event fires, **Then** the CD pipeline
+   automatically applies the change to `dev` within 5 minutes.
 2. **Given** the `dev` apply succeeds, **When** an engineer triggers the `staging`
    promotion, **Then** a plan is generated, reviewed, and the apply runs in `staging`
    before any production change.
@@ -184,8 +187,9 @@ files.
   tests, plan) fails.
 - **FR-006**: The CI pipeline MUST highlight destructive operations in the plan output
   and require the PR author to explicitly acknowledge them before the merge gate clears.
-- **FR-007**: The CD pipeline MUST apply changes to `dev` automatically upon merge to
-  `main`, preceded by a passing plan.
+- **FR-007**: The CD pipeline MUST trigger automatically on a GitHub release published
+  event and apply changes to `dev`, preceded by a passing plan. The release is created
+  by the release workflow when qualifying conventional commits are merged to `main`.
 - **FR-008**: The CD pipeline MUST require a manual trigger for `staging` promotion and
   MUST NOT apply to `staging` until the `dev` apply succeeds.
 - **FR-009**: The CD pipeline MUST require a manual trigger with explicit approval for

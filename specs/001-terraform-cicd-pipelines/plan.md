@@ -1,44 +1,44 @@
-# Implementation Plan: OpenTofu/Terragrunt CI/CD Pipelines with Semantic Versioning
+# Implementation Plan: Terraform/Terragrunt CI/CD Pipelines
 
 **Branch**: `001-terraform-cicd-pipelines` | **Date**: 2026-03-26 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/001-terraform-cicd-pipelines/spec.md`
 
 ## Summary
 
-Implement automated CI/CD pipelines for OpenTofu/Terragrunt infrastructure on Microsoft Azure
-using reusable GitHub Actions workflows from `jmckenzie17/homeschoolio-shared-actions`, pinned
-to semver tags. The CI pipeline (validate → test → plan) runs on every PR; the CD pipeline
-(dev auto-apply → staging manual → production gated) runs on merge to `main`. Semantic version
-tags are created automatically on merge via conventional commits using the existing
-`semver-release.yml` shared workflow.
+Implement automated CI/CD pipelines for an OpenTofu/Terragrunt monorepo targeting Microsoft Azure.
+CI runs on every PR: validate → test (tfsec, Checkov, OPA/Conftest) → plan (all environments) →
+destructive-op gate. CD triggers on GitHub release published (created by `release.yml` via
+semantic-release): auto-apply to `dev`, then manual-dispatch promotion to `staging` and
+`production`. Environment protection is enforced inside the shared `apply.yml` reusable workflow
+(not on the caller job). All shared workflow calls reference exact semver tags via the single
+`SHARED_WORKFLOWS_VERSION` env var.
 
 ## Technical Context
 
 **Language/Version**: HCL (OpenTofu ≥ 1.6) + Terragrunt ≥ 0.56
-**Primary Dependencies**: `opentofu/setup-opentofu@v1`, `actions/cache@v4`, `tj-actions/changed-files@v44`, `cycjimmy/semantic-release-action@v6` (via shared workflow), tfsec, Checkov, OPA/Conftest
-**Storage**: Azure Storage Account + Blob container per Terragrunt root (per constitution Principle V)
-**Testing**: tfsec (static HCL), Checkov (plan JSON), OPA/Conftest (custom policies) — no unit test framework
-**Target Platform**: GitHub Actions (ubuntu-latest runners); Microsoft Azure cloud
-**Project Type**: Infrastructure-as-code repository with CI/CD automation
-**Performance Goals**: CI completes within 5 minutes; CD applies to dev within 5 minutes of merge
-**Constraints**: All pipeline logic in `jmckenzie17/homeschoolio-shared-actions`; caller workflows must be thin; OIDC only (no long-lived credentials)
-**Scale/Scope**: 3 environment tiers (dev, staging, production); multiple Terragrunt roots per env
+**Primary Dependencies**: `opentofu/setup-opentofu@v1`, `actions/cache@v4`, tfsec, Checkov, Conftest, semantic-release
+**Storage**: Azure Storage Account `homeschooliostfstate` (eastus) — containers: `homeschoolio-dev-infra-tfstate`, `homeschoolio-staging-infra-tfstate`, `homeschoolio-production-infra-tfstate`
+**Testing**: tfsec (static HCL), Checkov (plan JSON), OPA/Conftest (custom policies in `policies/`)
+**Target Platform**: GitHub Actions (ubuntu-latest runners), Azure
+**Project Type**: CI/CD pipeline configuration (IaC)
+**Performance Goals**: CI completes in < 10 minutes for typical PRs
+**Constraints**: No Infracost; use lowest-cost Azure SKUs; POC SLA posture; `environment:` set inside `apply.yml` (not caller jobs); secrets unprefixed (environment-scoped)
+**Scale/Scope**: 3 environment tiers (dev / staging / production), single infrastructure domain
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Infrastructure as Code | ✅ PASS | All resources in HCL; pipeline enforces this via CI checks |
-| II. Environment Parity & Promotion | ✅ PASS | dev → staging → production chain enforced in `cd.yml`; no skipping |
-| III. Immutable Versioning | ✅ PASS | Shared workflows pinned to semver tags; `release.yml` creates semver tags on merge |
-| IV. Plan Before Apply | ✅ PASS | `plan.yml` runs on every PR; `apply.yml` runs pre-apply plan verification |
-| V. State Isolation & Locking | ✅ PASS | Azure Storage Account + Blob lease locking per root; consumed by pipeline |
-| VI. Observability & Auditability | ✅ PASS | SARIF uploads, PR comments, pipeline traceable to commit SHA and PR; Infracost deferred |
-| Cloud Provider Standards | ✅ PASS | Azure explicitly declared; ARM_ env vars; OIDC with AzureAD federation |
+| Principle | Status | Evidence |
+|-----------|--------|----------|
+| I. Infrastructure as Code | ✅ PASS | All resources in HCL; no manual changes |
+| II. Environment Parity & Promotion | ✅ PASS | dev → staging → production promotion enforced in CD; each env has own state backend |
+| III. Immutable Versioning | ✅ PASS | `SHARED_WORKFLOWS_VERSION: v1.2.0` pins all shared refs; no floating `@main` in CI/CD callers |
+| IV. Plan Before Apply | ✅ PASS | CI generates plan artifact on every PR; destructive-op gate requires explicit PR acknowledgment |
+| V. State Isolation & Locking | ✅ PASS | Azure Blob lease locking; one container per env; versioning enabled on storage account |
+| VI. Cost Consciousness & Observability | ✅ PASS | No Infracost required; lowest-cost tier policy; tfsec/Checkov/Conftest run in CI; audit logs tied to commit SHA |
 
-**Post-Phase-1 Re-check**: All gates still PASS. No violations introduced by design phase.
+**Post-design re-check**: All gates still pass. `environment:` constraint moved into `apply.yml` to satisfy GitHub Actions schema. Secret names unprefixed (scoped per GitHub environment).
 
 ## Project Structure
 
@@ -47,59 +47,41 @@ tags are created automatically on merge via conventional commits using the exist
 ```text
 specs/001-terraform-cicd-pipelines/
 ├── plan.md              # This file
-├── research.md          # Technical decisions
-├── data-model.md        # Key entities
-├── quickstart.md        # Validation steps per user story
-├── contracts/           # Workflow interface contracts
-│   ├── ci-workflow-inputs.md
-│   ├── cd-workflow-inputs.md
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
+├── contracts/           # Phase 1 output
+│   ├── ci-workflow.md
+│   ├── cd-workflow.md
 │   └── shared-workflow-interface.md
-└── tasks.md             # Implementation task list
+└── tasks.md             # Phase 2 output
 ```
 
 ### Source Code (repository root)
 
 ```text
 .github/
-└── workflows/
-    ├── ci.yml           # PR trigger: validate → test → plan → destructive-op gate
-    ├── cd.yml           # Merge promotion: dev (auto) → staging → production (gated)
-    └── release.yml      # Semantic version release via conventional commits
-
-homeschoolio-shared-workflows/
-└── .github/
-    └── workflows/       # Pushed to jmckenzie17/homeschoolio-shared-actions@v1.0.0
-        ├── validate.yml # Reusable: fmt check + validate
-        ├── test.yml     # Reusable: tfsec + Checkov + Conftest
-        ├── plan.yml     # Reusable: changed-root detection + plan + PR comment
-        └── apply.yml    # Reusable: pre-apply plan + terragrunt apply
-
-modules/
-└── example/
-    └── version.tf       # Module version template: locals { module_version = "1.0.0" }
-
-environments/
-├── dev/
-├── staging/
-└── production/
-
+├── workflows/
+│   ├── ci.yml           # PR + push-to-main validation pipeline
+│   ├── cd.yml           # Release-triggered deployment pipeline
+│   └── release.yml      # Semver release (calls shared semver-release.yml@main)
 policies/
-├── tags.rego            # Required Azure tag compliance
-├── naming.rego          # Resource naming convention enforcement
-└── README.md            # Policy documentation
-
-.opentofu-version        # 1.6.2
-.terragrunt-version      # 0.56.3
-.gitignore
+├── tags.rego            # OPA: required tag compliance
+├── naming.rego          # OPA: resource naming convention
+└── README.md
+environments/
+├── dev/                 # Terragrunt root (to be populated)
+├── staging/             # Terragrunt root (to be populated)
+└── production/          # Terragrunt root (to be populated)
+modules/                 # Reusable OpenTofu modules
 CHANGELOG.md
-CONTRIBUTING.md          # Conventional commit guidelines
+CONTRIBUTING.md
 ```
 
-**Structure Decision**: Infrastructure-as-code repository with GitHub Actions CI/CD. All
-pipeline logic lives in `jmckenzie17/homeschoolio-shared-actions`; this repo's `.github/workflows/`
-contains only thin caller workflows using `uses:`, `with:`, `secrets:`, `needs:`, `environment:`,
-and `env:` declarations.
+**Structure Decision**: IaC repository layout — workflows under `.github/workflows/`, OPA policies
+under `policies/`, environment compositions under `environments/{env}/`, modules under `modules/`.
+No traditional `src/` tree.
 
 ## Complexity Tracking
 
-No constitution violations — table not required.
+> No constitution violations requiring justification.

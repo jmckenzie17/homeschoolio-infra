@@ -7,39 +7,47 @@ on:
   push:
     branches: [main]
 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  actions: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Shared workflow version — bump this single value to upgrade all CI stages.
-env:
-  SHARED_WORKFLOWS_VERSION: v1.0.0
+# Shared workflow version — update the version in each uses: line below to upgrade.
+# Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
+# Current pinned version: v1.3.2
 
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.3.2
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
-
-  test:
-    name: Test
-    needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
-    with:
-      plan-json-artifact: tfplan-json-${{ github.run_id }}
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.3.2
     with:
       environments: "dev,staging,production"
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  test:
+    name: Test
+    needs: [validate, plan]
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.2
+    with:
+      plan-json-artifact: tfplan-json-${{ github.run_id }}
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   destructive-op-gate:
     name: Destructive Operation Gate
@@ -48,7 +56,7 @@ jobs:
     if: needs.plan.outputs.has-destructive-ops == 'true' && github.event_name == 'pull_request'
     steps:
       - name: Check for destructive-op acknowledgment in PR body
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
