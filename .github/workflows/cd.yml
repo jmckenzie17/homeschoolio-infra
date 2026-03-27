@@ -15,19 +15,43 @@ on:
 
 # Shared workflow version — update the version in each uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.3.4
+# Current pinned version: v1.3.5
 
 concurrency:
   group: cd-deployment
   cancel-in-progress: false
 
 jobs:
-  dev-apply:
-    name: Apply to dev
+  get-release-version:
+    name: Get release version
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success'
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
+    runs-on: ubuntu-latest
+    outputs:
+      tag-name: ${{ steps.read.outputs.tag-name }}
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - name: Download release metadata artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read version outputs
+        id: read
+        run: |
+          echo "tag-name=$(cat tag-name.txt)" >> "$GITHUB_OUTPUT"
+          echo "version=$(cat version.txt)" >> "$GITHUB_OUTPUT"
+
+  dev-apply:
+    name: Apply to dev
+    needs: get-release-version
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: dev
     secrets:
@@ -43,7 +67,7 @@ jobs:
       always() &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
       (needs.dev-apply.result == 'success')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: staging
     secrets:
@@ -59,7 +83,7 @@ jobs:
       always() &&
       needs.staging-apply.result == 'success' &&
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: production
     secrets:
