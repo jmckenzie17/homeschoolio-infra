@@ -1,9 +1,10 @@
 name: CD
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       target-environment:
@@ -23,7 +24,9 @@ concurrency:
 jobs:
   dev-apply:
     name: Apply to dev
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.4
     with:
       target-environment: dev
