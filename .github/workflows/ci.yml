@@ -28,15 +28,6 @@ jobs:
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
-  test:
-    name: Test
-    needs: [validate, plan]
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.2
-    with:
-      plan-json-artifact: tfplan-json-${{ github.run_id }}
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-
   plan:
     name: Plan
     needs: validate
@@ -48,6 +39,15 @@ jobs:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  test:
+    name: Test
+    needs: [validate, plan]
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.2
+    with:
+      plan-json-artifact: tfplan-json-${{ github.run_id }}
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   destructive-op-gate:
     name: Destructive Operation Gate
