@@ -27,8 +27,8 @@
 ### Session 2026-03-27 (correction)
 
 - Q: Should the CI pipeline also run on pushes to `main` (post-merge)? → A: No — CI runs on pull request events only; no post-merge run on `main`
-- Q: Why does the CD pipeline not trigger when a release is created? → A: `GITHUB_TOKEN`-created events (including releases created by `semantic-release`) do not trigger downstream workflow runs — a GitHub Actions security restriction. The CD pipeline must use `workflow_run` on the Release workflow completing successfully instead of `on: release: published`
-- Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: `push` event filtered to tag pattern `v[0-9]+.[0-9]+.[0-9]+` — fires when semantic-release pushes the Git tag (not subject to GITHUB_TOKEN downstream event restriction)
+- Q: Why does the CD pipeline not trigger when a release is created? → A: `GITHUB_TOKEN`-created events (including releases and tag pushes made by `semantic-release`) do not trigger downstream workflow runs — a GitHub Actions security restriction
+- Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: Merge the separate `release.yml` and `cd.yml` into a single `cd.yml` triggered on `push` to `main`; the `release` job runs `semantic-release` and the `dev-apply` job gates on `needs.release.outputs.release-created == 'true'` — no chaining or tokens needed
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -88,22 +88,23 @@ the violation, and that fixing it causes CI to pass.
 
 ### User Story 3 - Engineer Merges to Main and Infrastructure Promotes Through Environments (Priority: P2)
 
-After CI passes and a PR is merged to `main`, the release workflow creates a semver Git
-tag and GitHub release. The CD pipeline triggers on that release event and automatically
-applies to `dev`; `staging` and `production` promotion are available via manual trigger.
+After CI passes and a PR is merged to `main`, the CD pipeline runs automatically: the
+`release` job creates a semver Git tag and GitHub release via `semantic-release`; if a
+release is created, `dev-apply` runs automatically. `staging` and `production` promotion
+are available via manual `workflow_dispatch` trigger.
 
 **Why this priority**: Closes the loop from code review to live infrastructure. Builds
-on US1/US2 (CI must pass before merge is possible) and US4 (release event is the CD trigger).
+on US1/US2 (CI must pass before merge is possible) and US4 (the CD pipeline handles both
+release creation and deployment in one workflow).
 
-**Independent Test**: Merge a PR with a qualifying conventional commit; verify the release
-workflow creates a GitHub release, the CD pipeline triggers on that release event, and
-applies to `dev` automatically within 5 minutes.
+**Independent Test**: Merge a PR with a qualifying conventional commit; verify the CD
+pipeline creates a GitHub release and automatically applies to `dev` within 5 minutes.
 
 **Acceptance Scenarios**:
 
-1. **Given** a GitHub release is published (triggered by a qualifying conventional commit
-   merged to `main`), **When** the release event fires, **Then** the CD pipeline
-   automatically applies the change to `dev` within 5 minutes.
+1. **Given** a qualifying conventional commit is merged to `main`, **When** the CD
+   pipeline runs, **Then** a semver release is created and the pipeline automatically
+   applies the change to `dev` within 5 minutes.
 2. **Given** the `dev` apply succeeds, **When** an engineer triggers the `staging`
    promotion, **Then** a plan is generated, reviewed, and the apply runs in `staging`
    before any production change.
@@ -205,11 +206,12 @@ files.
   tests, plan) fails.
 - **FR-006**: The CI pipeline MUST highlight destructive operations in the plan output
   and require the PR author to explicitly acknowledge them before the merge gate clears.
-- **FR-007**: The CD pipeline MUST trigger automatically on a `push` event matching the
-  tag pattern `v[0-9]+.[0-9]+.[0-9]+`. This fires when `semantic-release` pushes the
-  Git tag to `main` and is not subject to the `GITHUB_TOKEN` downstream event restriction
-  that blocks `release: published` from triggering workflows. The CD pipeline applies
-  changes to `dev` on each trigger.
+- **FR-007**: The CD pipeline MUST trigger automatically on a `push` event to the `main`
+  branch. The `release` job within `cd.yml` runs `semantic-release` to create the semver
+  tag and GitHub release; the `dev-apply` job gates on `needs.release.outputs.release-created == 'true'`
+  and applies changes to `dev` only when a new release was created. This single-workflow
+  design avoids the `GITHUB_TOKEN` downstream event restriction entirely — no chaining or
+  additional tokens required.
 - **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against all
   Terragrunt environment roots unconditionally (no changed-files filtering); this
   ensures consistent environment state regardless of which files were modified in the
@@ -291,10 +293,12 @@ files.
   runtime; secret management is out of scope.
 - Destructive-operation acknowledgment is implemented as a PR description checkbox or
   label convention.
-- `GITHUB_TOKEN`-created events (including GitHub releases created by `semantic-release`
-  via `@semantic-release/github`) do NOT trigger downstream workflow runs. This is a
-  deliberate GitHub security restriction to prevent infinite loops. The CD pipeline
-  therefore uses `workflow_run` on the Release workflow rather than `on: release: published`.
+- `GITHUB_TOKEN`-created events (including GitHub releases and tag pushes made by
+  `semantic-release`) do NOT trigger downstream workflow runs — a deliberate GitHub
+  security restriction to prevent infinite loops. The CD pipeline avoids this restriction
+  by merging the release and deployment steps into a single `cd.yml` workflow triggered
+  on `push: branches: [main]`; both the `release` job and `dev-apply` job run in the
+  same workflow process, so no cross-workflow event boundary is crossed.
 - Each GitHub release represents the full desired state of the repository; a new release
   supersedes any pending unapplied state in `dev`. There is no expiry, staleness alert,
   or gate blocking a new CD run if a prior `staging` promotion was never triggered.
