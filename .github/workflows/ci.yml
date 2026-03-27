@@ -13,19 +13,19 @@ concurrency:
 
 # Shared workflow version — update the version in each uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.2.0
+# Current pinned version: v1.2.4
 
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.2.3
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.2.4
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   test:
     name: Test
     needs: [validate, plan]
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.3
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.4
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
     secrets:
@@ -34,12 +34,14 @@ jobs:
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.2.3
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.2.4
     with:
       environments: "dev,staging,production"
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   destructive-op-gate:
     name: Destructive Operation Gate
