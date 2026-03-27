@@ -2,6 +2,21 @@
 # Example module — creates a tagged resource group.
 # Used to validate the CI/CD pipeline end-to-end.
 
+terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+  use_oidc = true
+}
+
 resource "azurerm_resource_group" "this" {
   name     = "homeschoolio-${var.environment}-rg-example"
   location = var.location

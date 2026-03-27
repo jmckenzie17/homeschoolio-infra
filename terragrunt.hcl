@@ -15,28 +15,6 @@ locals {
   environment = length(local.path_parts) > 1 ? local.path_parts[1] : "unknown"
 }
 
-# Generate the AzureRM provider block in every child root.
-generate "provider" {
-  path      = "provider.tf"
-  if_exists = "overwrite_terragrunt"
-  contents  = <<-EOF
-    terraform {
-      required_version = ">= 1.6"
-      required_providers {
-        azurerm = {
-          source  = "hashicorp/azurerm"
-          version = "~> 3.0"
-        }
-      }
-    }
-
-    provider "azurerm" {
-      features {}
-      use_oidc = true
-    }
-  EOF
-}
-
 # Remote state: one container per environment root.
 # Container name format: homeschoolio-{env}-infra-tfstate
 remote_state {
