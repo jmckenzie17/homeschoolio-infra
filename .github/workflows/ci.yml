@@ -18,14 +18,14 @@ concurrency:
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.2.0
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.2.1
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   test:
     name: Test
     needs: [validate, plan]
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.0
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.1
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
     secrets:
@@ -34,7 +34,7 @@ jobs:
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.2.0
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.2.1
     with:
       environments: "dev,staging,production"
     secrets:
