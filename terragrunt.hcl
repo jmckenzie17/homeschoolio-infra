@@ -28,6 +28,7 @@ remote_state {
     storage_account_name = local.storage_account
     container_name       = "${local.project}-${local.environment}-infra-tfstate"
     key                  = "${path_relative_to_include()}/terraform.tfstate"
+    use_azuread_auth     = true
   }
 }
 
