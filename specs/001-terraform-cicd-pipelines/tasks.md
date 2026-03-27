@@ -169,6 +169,11 @@ no other changes to this repo.
 - [x] T033 [P] Verify all Azure infrastructure referenced by the pipeline (state storage accounts, Key Vault) carries required tags (`Project`, `Environment`, `ManagedBy = "opentofu"`, `Owner`) — add or extend `policies/tags.rego` if any resource types are not covered
 - [x] T034 ~~Add Infracost workflow~~ — superseded by constitution v1.1.0; cost awareness achieved via lowest-cost tier selection at authoring time; Infracost not required for POC
 - [x] T035 [P] Update `specs/001-terraform-cicd-pipelines/checklists/requirements.md` — mark all items complete after end-to-end quickstart validation
+- [x] T037 [P] Create root `terragrunt.hcl` at repo root — shared backend generation (AzureRM provider + remote state pointing to `homeschooliostfstate`; container name `homeschoolio-{env}-infra-tfstate`) and common inputs (`project`, `environment`, `location`)
+- [x] T038 [P] Create `environments/dev/terragrunt.hcl`, `environments/staging/terragrunt.hcl`, `environments/production/terragrunt.hcl` — environment-level locals files
+- [x] T039 [P] Create `environments/{dev,staging,production}/infra/terragrunt.hcl` — concrete Terragrunt roots calling `modules/example`; include `root` via `find_in_parent_folders()`
+- [x] T040 [P] Flesh out `modules/example/` — add `variables.tf` (project, environment, location, owner), `main.tf` (azurerm_resource_group with all required tags), `outputs.tf` (resource_group_name, resource_group_id)
+- [x] T041 Remove `homeschoolio-shared-workflows/` local directory — all workflows already pushed to `jmckenzie17/homeschoolio-shared-actions` at `v1.2.0`; local copy was dead weight
 - [ ] T036 Run full `specs/001-terraform-cicd-pipelines/quickstart.md` validation checklist end-to-end; confirm all acceptance criteria pass
 
 ---
