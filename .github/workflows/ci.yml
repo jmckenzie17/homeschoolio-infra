@@ -19,19 +19,19 @@ concurrency:
 
 # Shared workflow version — update the version in each uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.3.1
+# Current pinned version: v1.3.2
 
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.3.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.3.2
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   test:
     name: Test
     needs: [validate, plan]
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.2
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
     secrets:
@@ -40,7 +40,7 @@ jobs:
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.3.1
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.3.2
     with:
       environments: "dev,staging,production"
     secrets:
@@ -56,7 +56,7 @@ jobs:
     if: needs.plan.outputs.has-destructive-ops == 'true' && github.event_name == 'pull_request'
     steps:
       - name: Check for destructive-op acknowledgment in PR body
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
