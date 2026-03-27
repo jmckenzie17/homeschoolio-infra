@@ -28,7 +28,7 @@
 
 - Q: Should the CI pipeline also run on pushes to `main` (post-merge)? → A: No — CI runs on pull request events only; no post-merge run on `main`
 - Q: Why does the CD pipeline not trigger when a release is created? → A: `GITHUB_TOKEN`-created events (including releases created by `semantic-release`) do not trigger downstream workflow runs — a GitHub Actions security restriction. The CD pipeline must use `workflow_run` on the Release workflow completing successfully instead of `on: release: published`
-- Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: `workflow_run` trigger on the Release workflow completing — no PAT required, works within GITHUB_TOKEN scope, standard GitHub-native chaining pattern
+- Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: `push` event filtered to tag pattern `v[0-9]+.[0-9]+.[0-9]+` — fires when semantic-release pushes the Git tag (not subject to GITHUB_TOKEN downstream event restriction)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -205,11 +205,11 @@ files.
   tests, plan) fails.
 - **FR-006**: The CI pipeline MUST highlight destructive operations in the plan output
   and require the PR author to explicitly acknowledge them before the merge gate clears.
-- **FR-007**: The CD pipeline MUST trigger automatically via `workflow_run` on successful
-  completion of the Release workflow (which runs on push to `main` and creates semver
-  releases via `semantic-release`). The `release: published` event MUST NOT be used as
-  the CD trigger because `GITHUB_TOKEN`-created releases do not fire downstream workflow
-  events. The CD pipeline applies changes to `dev` on each trigger.
+- **FR-007**: The CD pipeline MUST trigger automatically on a `push` event matching the
+  tag pattern `v[0-9]+.[0-9]+.[0-9]+`. This fires when `semantic-release` pushes the
+  Git tag to `main` and is not subject to the `GITHUB_TOKEN` downstream event restriction
+  that blocks `release: published` from triggering workflows. The CD pipeline applies
+  changes to `dev` on each trigger.
 - **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against all
   Terragrunt environment roots unconditionally (no changed-files filtering); this
   ensures consistent environment state regardless of which files were modified in the
