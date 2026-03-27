@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `modules/azure-resource-group` v1.0.0 — OpenTofu module that provisions a tagged Azure resource
+  group (`{project}-{environment}-rg-main`) with required `Project`, `Environment`, `ManagedBy`,
+  and `Owner` tags; satisfies OPA naming and tag policies
+- Terragrunt roots for `dev`, `staging`, and `production` environments under
+  `environments/{env}/resource-group/`
+
 ---
 
 ## [1.0.0] — 2026-03-26
