@@ -12,7 +12,7 @@ on:
         options: [staging, production]
 
 env:
-  SHARED_WORKFLOWS_VERSION: v1.1.0
+  SHARED_WORKFLOWS_VERSION: v1.2.0
 
 jobs:
   dev-apply:

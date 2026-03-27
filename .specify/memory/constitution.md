@@ -1,12 +1,16 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.1 → 1.0.2
-Modified principles: none
+Version change: 1.0.2 → 1.1.0
+Modified principles:
+  - VI. Observability & Auditability: removed Infracost mandate; replaced with
+    lowest-cost tier selection policy and POC-appropriate SLA posture
+Modified sections:
+  - Deployment Workflow: removed "Cost delta reviewed" PR gate item
+  - Principle V rationale: removed "enterprise operations" framing
+  - Principle VI rationale: updated to POC context
 Added sections: none
 Removed sections: none
-Infrastructure Standards:
-  - Added explicit "Cloud provider: Microsoft Azure" declaration
 Templates requiring updates:
   ✅ .specify/memory/constitution.md — written (this file)
   ✅ .specify/templates/plan-template.md — no structural change required
@@ -34,7 +38,7 @@ provider directly.
   data sources.
 
 **Rationale**: Manual changes create untracked drift, audit failures, and
-unrepeatability—unacceptable in an enterprise CD pipeline.
+unrepeatability—unacceptable in an automated CD pipeline.
 
 ### II. Environment Parity & Promotion
 
@@ -96,21 +100,27 @@ sandbox environments.
   from the resources they track.
 
 **Rationale**: Shared or local state leads to concurrent-write corruption, accidental
-exposure of sensitive resource metadata, and unrecoverable state loss. Azure Blob
-versioning provides the recovery safety net required for enterprise operations.
+exposure of sensitive resource metadata, and unrecoverable state loss. Blob versioning
+provides a recovery safety net without requiring additional tooling.
 
-### VI. Observability & Auditability
+### VI. Cost Consciousness & Observability
 
-All infrastructure deployments MUST emit structured audit logs capturing: actor,
-timestamp, environment, change summary, and outcome.
+This is a proof-of-concept project. Resource selection MUST favour the lowest-cost
+tier that satisfies functional requirements. Enterprise-grade SLAs and high-availability
+configurations are explicitly out of scope unless a specific requirement demands them.
 
-- CI/CD pipeline runs MUST be traceable to a specific commit SHA and PR.
-- Cost estimation (e.g., Infracost) MUST run on every PR that modifies resources.
-- Policy-as-code checks (e.g., OPA, Checkov, tfsec) MUST run in CI and block merges
-  on HIGH-severity findings.
+- All infrastructure deployments MUST emit audit logs traceable to a commit SHA and PR.
+- Policy-as-code checks (OPA, Checkov, tfsec) MUST run in CI and block merges on
+  HIGH-severity findings.
+- Azure resource SKUs MUST default to the lowest available pricing tier (e.g., `Free`,
+  `Basic`, or `Standard` tiers) unless a functional constraint requires otherwise;
+  the constraint MUST be documented in the relevant module or environment config.
+- Automated cost estimation tools (e.g., Infracost) are NOT required; cost awareness
+  is achieved through deliberate tier selection at authoring time.
 
-**Rationale**: Enterprise compliance and incident response require a complete,
-tamper-evident record of who changed what, when, and why.
+**Rationale**: As a POC, the priority is learning and iteration speed over resilience
+and cost optimisation tooling. Lowest-tier defaults keep cloud spend predictable without
+requiring additional CI integrations.
 
 ## Infrastructure Standards
 
@@ -130,6 +140,8 @@ tamper-evident record of who changed what, when, and why.
   `ManagedBy = "opentofu"`, and `Owner`.
 - **Module structure**: Reusable modules MUST live under `modules/`; environment
   compositions MUST live under `environments/{env}/`.
+- **Resource tiers**: Default to the lowest-cost SKU that satisfies the functional
+  requirement; document any deviation in the module or environment config.
 
 ## Deployment Workflow
 
@@ -138,9 +150,9 @@ tamper-evident record of who changed what, when, and why.
   1. `terragrunt validate` across all changed roots.
   2. `terragrunt plan` artifact published and reviewed.
   3. Policy-as-code scan with zero HIGH/CRITICAL findings.
-  4. Cost delta reviewed (no hard block, but MUST be acknowledged in PR).
-  5. At least one peer review approval.
-- **Merge to `main`**: Triggers automated apply to `dev` after a passing plan.
+  4. At least one peer review approval.
+- **Merge to `main`**: Triggers the release workflow; qualifying conventional commits
+  create a GitHub release which in turn triggers the CD pipeline.
 - **Promotion to `staging`**: Manual trigger after `dev` apply succeeds; requires
   plan review.
 - **Promotion to `production`**: Manual trigger after `staging` apply succeeds;
@@ -169,4 +181,4 @@ Amendments MUST follow this procedure:
 the "Constitution Check" gate in the implementation plan. Complexity violations MUST
 be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.0.2 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-26
+**Version**: 1.1.0 | **Ratified**: 2026-03-26 | **Last Amended**: 2026-03-27
