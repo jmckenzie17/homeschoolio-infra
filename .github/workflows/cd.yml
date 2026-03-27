@@ -1,9 +1,7 @@
 name: CD
 
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -17,40 +15,29 @@ on:
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
 # Current pinned version: v1.3.5
 
+permissions:
+  contents: write
+
 concurrency:
   group: cd-deployment
   cancel-in-progress: false
 
 jobs:
-  get-release-version:
-    name: Get release version
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    outputs:
-      tag-name: ${{ steps.read.outputs.tag-name }}
-      version: ${{ steps.read.outputs.version }}
-    steps:
-      - name: Download release metadata artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release-metadata
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Read version outputs
-        id: read
-        run: |
-          echo "tag-name=$(cat tag-name.txt)" >> "$GITHUB_OUTPUT"
-          echo "version=$(cat version.txt)" >> "$GITHUB_OUTPUT"
+  release:
+    name: Semantic Version Release
+    if: github.event_name == 'push'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/semver-release.yml@v1.3.5
+    with:
+      release-branch: main
+      tag-prefix: "v"
+    secrets: inherit
 
   dev-apply:
     name: Apply to dev
-    needs: get-release-version
+    needs: release
     if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.event_name == 'push' &&
+      needs.release.outputs.release-created == 'true'
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: dev
@@ -62,11 +49,13 @@ jobs:
 
   staging-apply:
     name: Apply to staging
-    needs: dev-apply
-    if: |
+    needs: [release, dev-apply]
+    if: >-
       always() &&
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
-      (needs.dev-apply.result == 'success')
+      (
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'staging') ||
+        (github.event_name == 'push' && needs.dev-apply.result == 'success')
+      )
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: staging
@@ -78,11 +67,12 @@ jobs:
 
   production-apply:
     name: Apply to production
-    needs: staging-apply
-    if: |
+    needs: [release, staging-apply]
+    if: >-
       always() &&
       needs.staging-apply.result == 'success' &&
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.target-environment == 'production')
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.target-environment == 'production'
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/apply.yml@v1.3.5
     with:
       target-environment: production
