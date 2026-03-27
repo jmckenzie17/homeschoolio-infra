@@ -2,15 +2,17 @@
 # All environment roots inherit from this file via find_in_parent_folders().
 
 locals {
-  # Parse the environment name from the directory path:
-  # environments/{env}/... → env = path component at index 1
-  path_components = split("/", path_relative_to_include())
-  environment     = local.path_components[1]
+  project  = "homeschoolio"
+  location = "eastus"
 
-  project         = "homeschoolio"
-  location        = "eastus"
   storage_account = "homeschooliostfstate"
   resource_group  = "homeschoolio-shared-rg-tfstate"
+
+  # Derive environment from the relative path: environments/{env}/...
+  # path_relative_to_include() returns "" when evaluated at the root itself,
+  # so we guard with a fallback to avoid an out-of-bounds index.
+  path_parts  = split("/", path_relative_to_include())
+  environment = length(local.path_parts) > 1 ? local.path_parts[1] : "unknown"
 }
 
 # Generate the AzureRM provider block in every child root.
