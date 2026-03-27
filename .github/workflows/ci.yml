@@ -11,21 +11,21 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Shared workflow version — bump this single value to upgrade all CI stages.
-env:
-  SHARED_WORKFLOWS_VERSION: v1.2.0
+# Shared workflow version — update the version in each uses: line below to upgrade.
+# Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
+# Current pinned version: v1.2.0
 
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.2.0
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   test:
     name: Test
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.2.0
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
     secrets:
@@ -34,7 +34,7 @@ jobs:
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@${{ env.SHARED_WORKFLOWS_VERSION }}
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.2.0
     with:
       environments: "dev,staging,production"
     secrets:

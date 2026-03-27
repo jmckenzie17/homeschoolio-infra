@@ -149,11 +149,13 @@ terraform {
 To upgrade the pinned shared workflow version:
 
 1. Check [jmckenzie17/homeschoolio-shared-actions releases](https://github.com/jmckenzie17/homeschoolio-shared-actions/releases) for new tags
-2. Open a PR in this repo updating `SHARED_WORKFLOWS_VERSION` in `.github/workflows/ci.yml` and `cd.yml`:
+2. Open a PR in this repo updating the version in each `uses:` line in `.github/workflows/ci.yml` and `cd.yml`.
+   GitHub Actions does not allow env vars in `uses:` fields, so the version must be a literal string.
+   Update all occurrences (validate, test, plan in ci.yml; three apply calls in cd.yml):
    ```yaml
-   env:
-     SHARED_WORKFLOWS_VERSION: v1.1.0  # bumped from v1.0.0
+   uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.3.0
    ```
+   The comment at the top of each workflow file shows the current pinned version.
 3. Verify CI passes with the new shared workflow version
 4. Merge — new behavior takes effect with no other changes to this repo
 
