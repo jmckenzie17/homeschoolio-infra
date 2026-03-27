@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-azure-resource-group`
 **Created**: 2026-03-27
-**Status**: Draft
+**Status**: Ready
 **Input**: User description: "create a resource group that will hold homeschoolio resources"
 
 ## User Scenarios & Testing *(mandatory)*
@@ -49,7 +49,7 @@ An infrastructure engineer can cleanly destroy the resource group when decommiss
 **Acceptance Scenarios**:
 
 1. **Given** an empty resource group exists, **When** an engineer runs `terragrunt destroy`, **Then** the resource group is removed from Azure.
-2. **Given** a resource group with child resources, **When** destroy is attempted, **Then** the operation either succeeds (deleting all children) or fails with a clear error indicating child resources must be removed first.
+2. **Given** a resource group with child resources, **When** destroy is attempted, **Then** the operation succeeds and all child resources within the group are deleted by the cloud provider as part of the group removal.
 
 ---
 
@@ -63,9 +63,9 @@ An infrastructure engineer can cleanly destroy the resource group when decommiss
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST create an Azure resource group with a configurable name scoped to the environment (e.g., `homeschoolio-dev-rg`, `homeschoolio-production-rg`).
+- **FR-001**: The system MUST create an Azure resource group with a configurable name scoped to the environment following the 4-segment naming convention (e.g., `homeschoolio-dev-rg-main`, `homeschoolio-production-rg-main`).
 - **FR-002**: The resource group MUST be created in a configurable Azure region, defaulting to `eastus` consistent with existing infrastructure.
-- **FR-003**: The resource group MUST be tagged with at minimum: `environment`, `project`, and `managed-by` tags.
+- **FR-003**: The resource group MUST be tagged with at minimum: `Project`, `Environment`, `ManagedBy`, and `Owner` tags (PascalCase, enforced by the OPA tags policy).
 - **FR-004**: The Terragrunt module MUST integrate with the existing remote state backend (Azure Blob Storage) used by other roots in this repository.
 - **FR-005**: The resource group configuration MUST be deployable independently per environment using the existing Terragrunt environment directory structure.
 - **FR-006**: The module MUST pass existing static analysis checks (tfsec, Checkov, Conftest) without suppression overrides.
@@ -73,7 +73,7 @@ An infrastructure engineer can cleanly destroy the resource group when decommiss
 
 ### Key Entities
 
-- **Resource Group**: The Azure logical container for homeschoolio resources. Key attributes: name (environment-scoped), location (Azure region), tags (environment, project, managed-by).
+- **Resource Group**: The Azure logical container for homeschoolio resources. Key attributes: name (4-segment, environment-scoped, e.g., `homeschoolio-dev-rg-main`), location (Azure region), tags (`Project`, `Environment`, `ManagedBy`, `Owner`).
 - **Terragrunt Root**: The per-environment configuration directory that wires inputs into the OpenTofu module and configures the remote state backend.
 
 ## Success Criteria *(mandatory)*
