@@ -2,7 +2,7 @@
 # Staging infrastructure root — deploys the example module.
 
 include "root" {
-  path = find_in_parent_folders()
+  path = "${get_repo_root()}/terragrunt.hcl"
 }
 
 terraform {

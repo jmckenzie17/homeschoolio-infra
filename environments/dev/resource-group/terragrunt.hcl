@@ -2,7 +2,7 @@
 # Dev resource group root — deploys the azure-resource-group module.
 
 include "root" {
-  path = find_in_parent_folders()
+  path = "${get_repo_root()}/terragrunt.hcl"
 }
 
 terraform {
