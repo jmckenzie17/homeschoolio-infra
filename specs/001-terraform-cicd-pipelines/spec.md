@@ -24,6 +24,11 @@
 - Q: Should the CD pipeline apply all Terragrunt environment roots or only roots whose files changed in the release? → A: Apply all environment roots unconditionally on every release
 - Q: If `staging` promotion is never triggered before the next release fires, how should `dev` behave? → A: New release overwrites `dev` again unconditionally; no expiry, staleness tracking, or blocking of subsequent CD runs
 
+### Session 2026-03-27 (correction)
+
+- Q: Should the CI pipeline also run on pushes to `main` (post-merge)? → A: No — CI runs on pull request events only; no post-merge run on `main`
+- Q: Why does the CD pipeline not trigger when a release is created? → A: GitHub Actions `release` event triggers are only evaluated from workflows on the default branch (`main`); the CD workflow must be merged to `main` before any release event can fire it
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Engineer Opens a PR Against an Infrastructure Change (Priority: P1)
@@ -187,7 +192,8 @@ files.
 ### Functional Requirements
 
 - **FR-001**: The CI pipeline MUST trigger automatically on every pull request open,
-  update, and reopen event targeting the `main` branch.
+  update, and reopen event targeting the `main` branch. The CI pipeline MUST NOT
+  trigger on direct pushes to `main`.
 - **FR-002**: The CI pipeline MUST run validation checks confirming all Terragrunt
   configurations are syntactically correct using OpenTofu.
 - **FR-003**: The CI pipeline MUST execute automated infrastructure tests (policy-as-code
@@ -226,8 +232,9 @@ files.
 - **FR-011**: Pipeline workflow logic MUST be sourced from `homeschoolio-shared-workflows`
   at a pinned semver tag and MUST NOT be duplicated inline in this repository's workflow
   files; version upgrades MUST be performed via an explicit PR updating the pinned tag.
-- **FR-012**: The pipeline MUST run the same CI checks on `main` after every merge to
-  ensure the branch remains in a deployable state.
+- **FR-012**: ~~The pipeline MUST run the same CI checks on `main` after every merge.~~
+  Superseded — CI runs on pull requests only (FR-001). Post-merge CI on `main` is
+  not required; the PR gate is the deployability signal.
 - **FR-013**: All pipeline runs MUST be traceable to the triggering commit SHA and PR
   number in their logs.
 - **FR-014**: Pipeline failure notifications MUST be delivered exclusively via GitHub
@@ -284,6 +291,10 @@ files.
   runtime; secret management is out of scope.
 - Destructive-operation acknowledgment is implemented as a PR description checkbox or
   label convention.
+- GitHub Actions evaluates `release` and other non-PR event triggers only from workflows
+  on the repository's default branch (`main`). The CD workflow MUST be merged to `main`
+  before any `release: published` event can trigger it; releases created while `cd.yml`
+  exists only on a feature branch will not trigger CD.
 - Each GitHub release represents the full desired state of the repository; a new release
   supersedes any pending unapplied state in `dev`. There is no expiry, staleness alert,
   or gate blocking a new CD run if a prior `staging` promotion was never triggered.
