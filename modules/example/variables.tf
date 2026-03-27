@@ -1,6 +1,7 @@
 variable "project" {
   description = "Project name used in resource naming and tags."
   type        = string
+  default     = "homeschoolio"
 }
 
 variable "environment" {
