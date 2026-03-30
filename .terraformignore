@@ -1,0 +1,12 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl
+.terragrunt-cache/
+*.log
+.DS_Store
+.git/
+.github/
+specs/
+.specify/

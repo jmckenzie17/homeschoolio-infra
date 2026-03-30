@@ -30,7 +30,7 @@ Create a reusable OpenTofu module (`modules/azure-resource-group/`) that provisi
 | II. Environment parity | Module code identical across envs; only Terragrunt inputs differ | PASS | Single module, 3 roots with input-only differences |
 | II. State isolation | Each env root has its own remote state key | PASS | Root `terragrunt.hcl` generates unique key per path |
 | III. Immutable versioning | Module versioned at `1.0.0`; no floating refs | PASS | New module starts at `1.0.0` per constitution |
-| III. CHANGELOG entry | Required on version bump | PASS | Will accompany the PR |
+| III. CHANGELOG entry | Required on version bump | PASS | Entry present in `CHANGELOG.md` [Unreleased] section |
 | IV. Plan before apply | Plan published as CI artifact; reviewed before apply | PASS | Existing CI pipeline handles this |
 | IV. Destructive ops acknowledged | No replacements expected | PASS | Resource group creation is non-destructive |
 | V. Remote state | Azure Blob backend; no local state | PASS | Inherits root `terragrunt.hcl` backend config |
@@ -51,7 +51,7 @@ specs/002-azure-resource-group/
 ├── research.md      # Phase 0 output — decisions and unknowns resolved
 ├── data-model.md    # Phase 1 output — entities, variables, outputs
 ├── quickstart.md    # Phase 1 output — deploy/verify instructions
-└── tasks.md         # Phase 2 output (/speckit.tasks — not yet generated)
+└── tasks.md         # Phase 2 output (/speckit.tasks)
 ```
 
 ### Source Code (repository root)
@@ -113,7 +113,7 @@ Each root follows the `environments/dev/infra/terragrunt.hcl` pattern exactly:
 
 ```hcl
 include "root" {
-  path = find_in_parent_folders()
+  path = "${get_repo_root()}/terragrunt.hcl"
 }
 
 terraform {
@@ -129,12 +129,12 @@ The root `terragrunt.hcl` auto-injects `project`, `location` from locals and der
 
 ### Key Design Notes
 
-1. **Naming**: `homeschoolio-{env}-rg-main` — `main` is the descriptor per constitution convention; the spec's assumed name `homeschoolio-{env}-rg` has only 3 segments and would fail the OPA naming policy.
+1. **Naming**: `homeschoolio-{env}-rg-main` — `main` is the descriptor per constitution convention; a 3-segment name like `homeschoolio-{env}-rg` would fail the OPA naming policy (`policies/naming.rego`).
 
-2. **Tags**: Must use PascalCase keys (`Project`, `Environment`, `ManagedBy`, `Owner`) as enforced by `policies/tags.rego`. The spec incorrectly documented them as lowercase/kebab — this is corrected in `research.md`.
+2. **Tags**: Must use PascalCase keys (`Project`, `Environment`, `ManagedBy`, `Owner`) as enforced by `policies/tags.rego`. FR-003 in spec.md uses incorrect lowercase/kebab casing — the Assumptions section and this plan are authoritative.
 
-3. **State key**: Will resolve to `environments/{env}/resource-group/terraform.tfstate` within the `homeschoolio-{env}-infra-tfstate` container. Unique, no collision with the existing `infra` root state.
+3. **State key**: Will resolve to `environments/{env}/resource-group/terraform.tfstate` within the `homeschoolio-{env}-infra-tfstate` container. Unique; no collision with the existing `infra` root state.
 
 4. **No new containers**: The existing per-environment blob containers are reused. No Terraform/manual provisioning of new containers is required.
 
-5. **CHANGELOG**: A `1.0.0` entry must be added to `CHANGELOG.md` for the new module per constitution Principle III.
+5. **CHANGELOG**: A `1.0.0` entry is present in `CHANGELOG.md` [Unreleased] section for the new module per constitution Principle III.

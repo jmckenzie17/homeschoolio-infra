@@ -17,6 +17,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Terragrunt roots for `dev`, `staging`, and `production` environments under
   `environments/{env}/resource-group/`
 
+### Removed
+
+- `modules/example/` — CI/CD validation scaffold; superseded by `modules/azure-resource-group/`
+- `environments/{env}/infra/` Terragrunt roots that sourced the example module
+
 ---
 
 ## [1.0.0] — 2026-03-26
@@ -36,7 +41,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `tags.rego` — Required tag enforcement: `Project`, `Environment`, `ManagedBy`, `Owner`
   - `naming.rego` — Naming convention: `{project}-{environment}-{resource-type}-{descriptor}`
 - `CONTRIBUTING.md` with conventional commit guidelines and version bump reference table
-- Module version template at `modules/example/version.tf`
 - Repository tooling: `.opentofu-version` (1.6.2), `.terragrunt-version` (0.56.3), `.gitignore`
 
 ---

@@ -33,8 +33,8 @@ HCL (OpenTofu ≥ 1.6) + Terragrunt ≥ 0.56: Follow standard conventions
 
 ## Recent Changes
 - 002-azure-resource-group: Added HCL (OpenTofu 1.6.2, pinned via `.opentofu-version`) + Terragrunt 0.56.3 (pinned via `.terragrunt-version`); AzureRM provider `~> 3.0`
+- 002-azure-resource-group: Added HCL (OpenTofu 1.6.2, pinned via `.opentofu-version`) + Terragrunt 0.56.3 (pinned via `.terragrunt-version`); AzureRM provider `~> 3.0`
 - 001-terraform-cicd-pipelines: Added HCL (OpenTofu 1.6.2) + Terragrunt 0.56.3 (pinned via `.opentofu-version` / `.terragrunt-version`) + `opentofu/setup-opentofu@v1`, `actions/cache@v4`, `jmckenzie17/homeschoolio-shared-actions@v1.3.2` (validate, plan, test, apply, semver-release shared workflows)
-- 001-terraform-cicd-pipelines: Added HCL (OpenTofu ≥ 1.6) + Terragrunt ≥ 0.56 + `opentofu/setup-opentofu@v1`, `actions/cache@v4`, tfsec, Checkov, Conftest, semantic-release
 
 
 <!-- MANUAL ADDITIONS START -->
