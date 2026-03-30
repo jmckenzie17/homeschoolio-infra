@@ -1,7 +1,7 @@
 # Research: OpenTofu/Terragrunt CI/CD Pipelines
 
 **Feature**: 001-terraform-cicd-pipelines
-**Date**: 2026-03-26
+**Date**: 2026-03-30 (updated for dev-only scope)
 
 ## 1. OpenTofu + Terragrunt in GitHub Actions
 
@@ -146,6 +146,36 @@ auditable release history. Eliminates the manual `version.tf` bump pattern entir
 **Alternatives considered**:
 - Pin to commit SHA: maximum security but reduces readability; deferred to a future security hardening pass.
 - Keep `@main`: violates constitution and spec FR-011; rejected.
+
+---
+
+## 6. Dev-Only Scope: CD Pipeline Changes (Session 2026-03-30)
+
+**Decision**: Remove `staging-apply` and `production-apply` jobs from `cd.yml`. Remove
+the `workflow_dispatch` input block (staging/production manual trigger). The CD pipeline
+is: `release` job → `dev-apply` job only.
+
+Also: narrow `plan` job in `ci.yml` from `environments: "dev,staging,production"` to
+`environments: "dev"`.
+
+**Rationale**: Staging and production promotion are explicitly deferred to a future
+feature (spec clarification 2026-03-30). Removing these jobs reduces cognitive load,
+eliminates accidental apply risk to non-dev environments, and keeps the CD workflow
+surface area minimal. The `dev-apply` job already correctly gates on
+`needs.release.outputs.release-created == 'true'` — no changes needed to its logic.
+
+**Impact on existing research**:
+- Section 5a (tag pattern filtering on `on.release`): The CD pipeline does not use
+  `on.release` as a trigger; it uses `on: push: branches: [main]`. The `dev-apply` job
+  already gates on `release-created == 'true'` output from the `release` job, which only
+  produces stable semver tags via semantic-release. Tag pattern filtering via job `if:`
+  conditions is NOT needed — the `release-created` output is the gate.
+- Section 5 (GitHub environment protection rules): Only the `dev` environment is needed
+  for this feature. Staging/production environment creation is deferred.
+
+**Concrete changes**:
+1. `ci.yml`: `plan` job `with.environments: "dev"` (was `"dev,staging,production"`)
+2. `cd.yml`: remove `workflow_dispatch` trigger block, `staging-apply` job, `production-apply` job
 
 ---
 

@@ -1,7 +1,7 @@
 # Data Model: OpenTofu/Terragrunt CI/CD Pipelines
 
 **Feature**: 001-terraform-cicd-pipelines
-**Date**: 2026-03-26
+**Date**: 2026-03-30 (updated for dev-only scope)
 
 ## Entities
 
@@ -32,7 +32,7 @@ infrastructure domain.
 | Field | Type | Description | Constraints |
 |-------|------|-------------|-------------|
 | `path` | string | Relative path from repo root | e.g., `environments/dev/networking` |
-| `environment` | enum | `dev`, `staging`, `production` | Required |
+| `environment` | enum | `dev` (only value in scope; staging/production deferred) | Required |
 | `domain` | string | Infrastructure domain name | e.g., `networking`, `compute`, `data` |
 | `state_backend` | string | Azure Storage Account container URI | Required; unique per root; format: `{account}/{container}` |
 | `last_applied_sha` | string | Commit SHA of last successful apply | Updated on apply |
@@ -109,30 +109,25 @@ A pinned reference from this repo to a reusable workflow in `homeschoolio-shared
 
 ## State Transitions
 
-### CD Environment Promotion
+### CD Environment Promotion (dev-only scope)
+
+Staging and production promotion are out of scope for this feature (deferred to a future
+feature). The CD pipeline only applies to `dev`.
 
 ```text
 [PR Merged to main]
        │
        ▼
-  dev-apply ──(fail)──► STOP (no staging)
+  release job (semantic-release)
        │
-    (success)
-       │
-       ▼
-  staging-apply ◄── manual trigger
-  (no protection)
-       │
-    (success)
-       │
-       ▼
-  production-apply ◄── manual trigger + required reviewer approval
-  (GitHub env gate)
-       │
-    (success)
-       │
-       ▼
-   [Complete]
+  release-created == 'true'?
+       ├── No → STOP (no release; no apply)
+       └── Yes
+             │
+             ▼
+        dev-apply
+             ├── fail → STOP (pipeline fails; reported via GitHub checks)
+             └── success → COMPLETE
 ```
 
 ### Module Version Tag Lifecycle

@@ -30,6 +30,12 @@
 - Q: Why does the CD pipeline not trigger when a release is created? → A: `GITHUB_TOKEN`-created events (including releases and tag pushes made by `semantic-release`) do not trigger downstream workflow runs — a GitHub Actions security restriction
 - Q: How should the CD pipeline be triggered given the GITHUB_TOKEN restriction? → A: Merge the separate `release.yml` and `cd.yml` into a single `cd.yml` triggered on `push` to `main`; the `release` job runs `semantic-release` and the `dev-apply` job gates on `needs.release.outputs.release-created == 'true'` — no chaining or tokens needed
 
+### Session 2026-03-30
+
+- Q: Should `staging` and `production` promotion be removed from scope entirely for this feature, or should the CD pipeline be designed to support them but simply not wired up yet? → A: Remove staging/production from this feature entirely — dev-apply only; staging/production are future work
+- Q: Should FR-007b target all Terragrunt environment roots or only the `dev` root explicitly? → A: Explicitly target only the `dev` environment root; all other roots ignored
+- Q: With only `dev` in scope, should concurrent CD runs queue or cancel-in-progress? → A: Queue (`cancel-in-progress: false`) — every release is applied to dev; none silently dropped
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Engineer Opens a PR Against an Infrastructure Change (Priority: P1)
@@ -86,12 +92,12 @@ the violation, and that fixing it causes CI to pass.
 
 ---
 
-### User Story 3 - Engineer Merges to Main and Infrastructure Promotes Through Environments (Priority: P2)
+### User Story 3 - Engineer Merges to Main and Infrastructure Deploys to Dev (Priority: P2)
 
 After CI passes and a PR is merged to `main`, the CD pipeline runs automatically: the
 `release` job creates a semver Git tag and GitHub release via `semantic-release`; if a
-release is created, `dev-apply` runs automatically. `staging` and `production` promotion
-are available via manual `workflow_dispatch` trigger.
+release is created, `dev-apply` runs automatically. Staging and production promotion are
+out of scope for this feature and will be addressed in a future feature.
 
 **Why this priority**: Closes the loop from code review to live infrastructure. Builds
 on US1/US2 (CI must pass before merge is possible) and US4 (the CD pipeline handles both
@@ -105,15 +111,9 @@ pipeline creates a GitHub release and automatically applies to `dev` within 5 mi
 1. **Given** a qualifying conventional commit is merged to `main`, **When** the CD
    pipeline runs, **Then** a semver release is created and the pipeline automatically
    applies the change to `dev` within 5 minutes.
-2. **Given** the `dev` apply succeeds, **When** an engineer triggers the `staging`
-   promotion, **Then** a plan is generated, reviewed, and the apply runs in `staging`
-   before any production change.
-3. **Given** the `staging` apply succeeds, **When** an engineer triggers the `production`
-   promotion, **Then** the pipeline pauses at a GitHub environment protection gate and
-   applies to production only after a designated reviewer approves via the Actions UI.
-4. **Given** any apply fails in any environment, **When** the failure occurs, **Then**
-   the pipeline stops, no further promotion occurs, and the failure is reported with
-   enough detail for the engineer to diagnose and remediate.
+2. **Given** any apply fails in `dev`, **When** the failure occurs, **Then**
+   the pipeline stops and the failure is reported with enough detail for the engineer
+   to diagnose and remediate.
 
 ---
 
@@ -212,19 +212,20 @@ files.
   and applies changes to `dev` only when a new release was created. This single-workflow
   design avoids the `GITHUB_TOKEN` downstream event restriction entirely — no chaining or
   additional tokens required.
-- **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against all
-  Terragrunt environment roots unconditionally (no changed-files filtering); this
-  ensures consistent environment state regardless of which files were modified in the
-  release.
+- **FR-007b**: On each CD trigger, the pipeline MUST run plan and apply against the `dev`
+  environment root explicitly; all other environment roots (staging, production) are
+  ignored. No changed-files filtering is applied — the `dev` root is always targeted
+  unconditionally on every release.
 - **FR-007a**: The CD pipeline MUST use a GitHub Actions concurrency group scoped to the
   CD workflow with `cancel-in-progress: false` so that a second release published while
   a prior CD run is active is queued and executed after the active run completes; no
   release MUST be silently dropped.
-- **FR-008**: The CD pipeline MUST require a manual trigger for `staging` promotion and
-  MUST NOT apply to `staging` until the `dev` apply succeeds.
-- **FR-009**: The CD pipeline MUST require a manual trigger with explicit approval for
-  `production` promotion via GitHub environment protection rules (required reviewers)
-  and MUST NOT apply to `production` until the `staging` apply succeeds.
+- **FR-008**: ~~The CD pipeline MUST require a manual trigger for `staging` promotion.~~
+  Out of scope — staging/production promotion deferred to a future feature. The CD pipeline
+  applies only to `dev` automatically; no staging or production jobs are implemented.
+- **FR-009**: ~~The CD pipeline MUST require a manual trigger with explicit approval for
+  `production` promotion.~~ Out of scope — staging/production promotion deferred to a
+  future feature.
 - **FR-010**: The pipeline MUST create a versioned Git tag on every merge to `main`
   that contains qualifying conventional commits (`feat:` → minor, `fix:` → patch,
   `BREAKING CHANGE` footer → major), using the shared
@@ -264,8 +265,9 @@ files.
   within 5 minutes of the triggering event, with zero manual initiation required.
 - **SC-002**: Zero infrastructure changes reach `dev` without first passing all CI
   checks (validation, tests, plan review gate).
-- **SC-003**: Zero infrastructure changes reach `staging` or `production` without a
-  prior successful apply in the preceding environment tier.
+- **SC-003**: ~~Zero infrastructure changes reach `staging` or `production` without a
+  prior successful apply in the preceding environment tier.~~ Out of scope — staging/production
+  promotion is deferred to a future feature.
 - **SC-004**: 100% of merged PRs that include a module version bump result in a
   corresponding Git tag within 2 minutes of merge.
 - **SC-005**: Engineers can identify the root cause of a CI failure solely from the
@@ -279,8 +281,9 @@ files.
   repository containing reusable workflow files.
 - The IaC runtime is **OpenTofu** (formerly referred to as "Terraform" in the original
   description); Terragrunt wraps OpenTofu for DRY environment composition.
-- The three environment tiers are `dev`, `staging`, and `production`; environment roots
-  are organized under `environments/{env}/` in this repo.
+- The target deployment environment for this feature is `dev` only; `staging` and
+  `production` environment roots exist in the repo but are out of scope for this feature's
+  CD pipeline implementation. Environment roots are organized under `environments/{env}/`.
 - OpenTofu modules under `modules/` are versioned independently; each module maintains
   its own `MAJOR.MINOR.PATCH` version string.
 - Infrastructure tests are policy-as-code checks that run against the plan output or

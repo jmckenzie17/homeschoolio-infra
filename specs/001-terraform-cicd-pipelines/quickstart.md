@@ -1,50 +1,51 @@
 # Quickstart: OpenTofu/Terragrunt CI/CD Pipelines
 
 **Feature**: 001-terraform-cicd-pipelines
-**Date**: 2026-03-26
+**Date**: 2026-03-30 (updated for dev-only scope)
+
+> **Scope note**: This feature deploys to the `dev` environment only. Staging and
+> production promotion are out of scope and will be addressed in a future feature.
 
 ## Prerequisites
 
 Before implementing, verify:
 
-- [ ] Repository has `environments/dev/`, `environments/staging/`, `environments/production/` directory structure
-- [ ] At least one module exists under `modules/`
-- [ ] Remote state backend is configured per project constitution (Azure Storage Account + Blob lease locking)
-- [ ] `jmckenzie17/homeschoolio-shared-actions` repository is at tag `v1.0.0` with all shared workflows
-- [ ] GitHub repository admin access (to configure environments and branch protection)
+- [ ] Repository has `environments/dev/infra/` directory structure
+- [ ] At least one module exists under `modules/` (currently `modules/example`)
+- [ ] Remote state backend is configured per project constitution (Azure Storage Account + Blob lease locking; `homeschoolio-dev-infra-tfstate` container)
+- [ ] `jmckenzie17/homeschoolio-shared-actions` is at tag `v1.3.6` with all shared workflows
+- [ ] GitHub repository admin access (to configure branch protection)
 
 ---
 
-## Step 1: Configure GitHub Branch Protection (T017)
+## Step 1: Configure GitHub Branch Protection
 
 In GitHub → Repository → Settings → Branches → Add rule for `main`:
 
 1. Check **Require a pull request before merging**
    - Set **Required approvals**: 1
 2. Check **Require status checks to pass before merging**
-   - Add required checks: `validate`, `test`, `plan`
+   - Add required checks: `Validate`, `Plan`, `Test`, `Destructive Operation Gate`
+   - Note: `Destructive Operation Gate` only runs when the plan contains destructive ops; GitHub will treat it as optional when it doesn't trigger.
    - Check **Require branches to be up to date before merging**
 3. Click **Save changes**
 
-**Validation**: Open a PR and confirm the merge button is blocked until `validate`, `test`, and
-`plan` checks all pass.
+**Validation**: Open a PR and confirm the merge button is blocked until `Validate`, `Plan`, and
+`Test` checks all pass.
 
 ---
 
-## Step 2: Configure GitHub Environments (T022)
+## Step 2: Configure GitHub Environments
 
 In GitHub → Repository → Settings → Environments:
 
-1. Create `dev` — no protection rules
-2. Create `staging` — no protection rules (manual `workflow_dispatch` is the gate)
-3. Create `production`:
-   - Add **Required reviewers** (1+ individuals or teams)
-   - Set **Deployment branches**: Selected branches → `main`
-   - (Optional) Add a **Wait timer** (e.g., 60 minutes for smoke-test window)
+1. Create `dev` — no protection rules required for this feature
+
+Staging and production environments are out of scope for this feature.
 
 ---
 
-## Step 3: Add Azure OIDC Secrets per Environment (T023)
+## Step 3: Add Azure OIDC Secrets
 
 For each GitHub environment, add the following secrets (use OIDC workload identity federation):
 
@@ -100,41 +101,38 @@ To configure OIDC federation for each managed identity, add the following federa
 
 ---
 
-## US3 Validation: Environment Promotion Chain
+## US3 Validation: Merge to Main Deploys to Dev
 
 1. Merge a PR with a qualifying conventional commit (e.g., `feat:` or `fix:`)
-2. Verify the **release** workflow runs and a GitHub release is published with a stable semver tag (e.g., `v1.1.0`)
-3. Verify the **Apply to dev** job triggers automatically on the release event within 5 minutes
-   - To verify the tag filter works: manually create a GitHub release with a pre-release tag (e.g., `v1.2.0-beta.1`) or mark the release as a pre-release; confirm the CD `dev-apply` job is skipped (condition evaluates false)
-5. To trigger staging promotion:
-   - Go to Actions → CD workflow → click **Run workflow**
-   - Select `target-environment: staging`
-   - Verify `staging-apply` job runs after `dev-apply` succeeds
-6. To trigger production promotion:
-   - Go to Actions → CD workflow → click **Run workflow**
-   - Select `target-environment: production`
-   - Verify the pipeline pauses at the `production` environment protection gate (enforced inside `apply.yml`)
-   - Approve the deployment via the Actions UI
-   - Verify `production-apply` runs only after approval
+2. Verify the **CD** workflow runs on push to `main`
+3. Verify the **release** job creates a GitHub release with a stable semver tag (e.g., `v1.1.0`)
+4. Verify the **Apply to dev** job triggers automatically (gates on `release-created == 'true'`) within 5 minutes
+5. Verify no staging or production jobs appear in the workflow run
 
-If any apply fails, verify the pipeline stops with a clear error and no further promotion occurs.
+If the apply fails, verify the pipeline stops with a clear error visible in GitHub Actions.
 
 ---
 
 ## US4 Validation: Semver Release via Conventional Commits
 
+The `release` job in `cd.yml` runs `semantic-release` on every push to `main`. The
+`dev-apply` job only runs when `release-created == 'true'`.
+
 1. Merge a PR whose commits include `feat: add vpc module`
    - Verify Git tag `v{NEXT_MINOR}` (e.g., `v1.1.0`) is created within 2 minutes
    - Verify the floating `v1` pointer tag is updated
+   - Verify the `dev-apply` job runs automatically after `release`
 
 2. Merge a PR whose commits include `fix: correct subnet CIDR`
    - Verify Git tag `v{NEXT_PATCH}` (e.g., `v1.0.1`) is created
+   - Verify `dev-apply` runs
 
 3. Merge a PR containing `BREAKING CHANGE` in a commit footer
    - Verify Git tag `v{NEXT_MAJOR}` (e.g., `v2.0.0`) is created
 
 4. Merge a PR whose commits are only `chore:` or `docs:` type
    - Verify **no new tag** is created
+   - Verify `dev-apply` is **skipped** (condition `release-created == 'true'` is false)
 
 To reference a tag in a downstream `terragrunt.hcl`:
 ```hcl
@@ -165,6 +163,7 @@ To upgrade the pinned shared workflow version:
 ## Upgrading Shared Workflow Versions
 
 No workflow logic needs to be copied or re-implemented locally. To upgrade, open a PR bumping the
-pinned version literal in every `uses:` line in `ci.yml`, `cd.yml`, and `release.yml` (e.g.,
-`@v1.3.2` → `@v1.4.0`). GitHub Actions does not support env vars in `uses:` fields; the version
-must be a literal string. A comment at the top of each workflow file tracks the current pinned version.
+pinned version literal in every `uses:` line in `ci.yml` and `cd.yml` (e.g., `@v1.3.6` → `@v1.4.0`).
+GitHub Actions does not support env vars in `uses:` fields; the version must be a literal string.
+The comment at the top of each workflow file (`# Current pinned version: vX.Y.Z`) tracks the
+current version — update this comment in the same PR.
