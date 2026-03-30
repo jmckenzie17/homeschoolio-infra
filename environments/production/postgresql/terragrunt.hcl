@@ -44,6 +44,10 @@ inputs = {
   aks_outbound_ip     = dependency.aks.outputs.aks_outbound_ip
   sku_name            = "GP_Standard_D4ds_v5"
   storage_mb          = 131072
+  # eastus is offer-restricted for PostgreSQL Flexible Server on this subscription;
+  # eastus2 is used instead. The resource group remains in eastus — Azure allows
+  # resources to be in a different region from their resource group.
+  location            = "eastus2"
   # pg_admin_password is supplied via TF_VAR_pg_admin_password environment variable.
   # Do not hardcode this value.
 }

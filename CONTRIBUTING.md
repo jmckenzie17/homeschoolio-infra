@@ -104,7 +104,36 @@ Defaults: `external-secrets` / `external-secrets`.
 If the External Secrets Operator deployment uses different values, override in the environment's
 `aks/terragrunt.hcl` `inputs` block before applying.
 
-### 4. Apply Order
+### 4. Grant Pipeline Service Principal Permission to Write Role Assignments
+
+The Key Vault module creates RBAC role assignments on the vault itself. The pipeline service
+principal needs `Microsoft.Authorization/roleAssignments/write` to do this — a permission not
+included in `Contributor`. This is a **one-time bootstrap step per environment resource group**
+and cannot be managed by Terraform itself (the SP would need the permission before Terraform can
+grant it).
+
+Run once per environment, after the resource group has been created but before applying key-vault:
+
+```bash
+SP_OBJECT_ID="5f6429b1-ac39-4d84-a355-131f3adfdeb7"
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+for env in dev staging production; do
+  az role assignment create \
+    --assignee "$SP_OBJECT_ID" \
+    --role "User Access Administrator" \
+    --scope "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/homeschoolio-${env}-rg-main"
+done
+```
+
+> **Why `User Access Administrator` and not `Owner`?** `User Access Administrator` grants only
+> `Microsoft.Authorization/*` without the broad resource management rights of `Owner`. Scope it
+> to the resource group — not the subscription — to limit blast radius.
+>
+> **Why not in Terraform?** The pipeline SP needs this permission before it can create any role
+> assignment. Managing it in Terraform creates a circular bootstrap dependency.
+
+### 5. Apply Order
 
 Apply modules in this order (Terragrunt resolves automatically with `run-all apply`):
 
@@ -114,7 +143,7 @@ Apply modules in this order (Terragrunt resolves automatically with `run-all app
 3. postgresql + key-vault  (parallel — both depend only on aks outputs)
 ```
 
-### 5. Key Vault Immutable Settings
+### 6. Key Vault Immutable Settings
 
 The following settings are **immutable after first apply** — verify before provisioning:
 
