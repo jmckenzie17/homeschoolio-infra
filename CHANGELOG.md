@@ -11,6 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `modules/azure-aks` v1.0.0 — Public AKS cluster with `authorized_ip_ranges` restricting API
+  server access; pre-allocated static outbound public IP for deterministic PostgreSQL firewall rules;
+  kubenet network plugin; Workload Identity enabled with ESO user-assigned managed identity and
+  federated identity credential
+- `modules/azure-postgresql` v1.0.0 — PostgreSQL Flexible Server with public endpoint restricted to
+  AKS outbound IP via firewall rule; pre-seeded with `temporal` and `temporal_visibility` databases;
+  max_connections and pg_stat_statements tuned for Temporal workloads
+- `modules/azure-key-vault` v1.0.0 — Key Vault in RBAC mode with public endpoint and no
+  network-level firewall; PostgreSQL credentials stored as secrets; ESO UAMI granted Key Vault
+  Secrets User role
+- Terragrunt roots for `dev`, `staging`, and `production` environments for `aks`, `postgresql`,
+  and `key-vault` modules
+- Extended `policies/naming.rego` enforced_types with `azurerm_postgresql_flexible_server`,
+  `azurerm_user_assigned_identity`, `azurerm_public_ip`
+
 - `modules/azure-resource-group` v1.0.0 — OpenTofu module that provisions a tagged Azure resource
   group (`{project}-{environment}-rg-main`) with required `Project`, `Environment`, `ManagedBy`,
   and `Owner` tags; satisfies OPA naming and tag policies
