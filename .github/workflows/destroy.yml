@@ -1,0 +1,73 @@
+name: Destroy Infrastructure
+
+# Manual trigger only — this workflow MUST NOT run automatically on push or PR.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment to destroy
+        required: true
+        type: choice
+        options: [dev, staging, production]
+      confirm-destroy:
+        description: Check to confirm you want to permanently destroy all infrastructure in the selected environment
+        required: true
+        type: boolean
+        default: false
+
+# Shared workflow version — update the version in each uses: line below to upgrade.
+# Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
+# Current pinned version: v1.5.0
+
+permissions:
+  contents: read
+  id-token: write
+
+# Share the cd-deployment concurrency group so a destroy cannot run
+# concurrently with an active apply in any environment.
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
+
+jobs:
+  dev-destroy:
+    name: Destroy dev
+    if: inputs.environment == 'dev'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/destroy.yml@v1.5.0
+    with:
+      target-environment: dev
+      confirm-destroy: ${{ inputs.confirm-destroy }}
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      pg_admin_password: ${{ secrets.TF_VAR_PG_ADMIN_PASSWORD }}
+
+  staging-destroy:
+    name: Destroy staging
+    if: inputs.environment == 'staging'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/destroy.yml@v1.5.0
+    with:
+      target-environment: staging
+      confirm-destroy: ${{ inputs.confirm-destroy }}
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      pg_admin_password: ${{ secrets.TF_VAR_PG_ADMIN_PASSWORD }}
+
+  production-destroy:
+    name: Destroy production
+    if: inputs.environment == 'production'
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/destroy.yml@v1.5.0
+    with:
+      target-environment: production
+      confirm-destroy: ${{ inputs.confirm-destroy }}
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      pg_admin_password: ${{ secrets.TF_VAR_PG_ADMIN_PASSWORD }}
