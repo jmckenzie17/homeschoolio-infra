@@ -49,10 +49,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Validate `modules/azure-resource-group/main.tf` locally: run `terragrunt validate` from `environments/dev/resource-group/` and resolve any HCL errors
-- [ ] T011 [US1] Run `terragrunt plan` from `environments/dev/resource-group/` and verify the plan shows exactly 1 resource to add (`azurerm_resource_group.this`) with name `homeschoolio-dev-rg-main`, location `eastus`, and all four tags present
-- [ ] T012 [US1] Run `terragrunt apply` from `environments/dev/resource-group/` and confirm the resource group appears in Azure
-- [ ] T013 [US1] Verify idempotency: run `terragrunt plan` again from `environments/dev/resource-group/` and confirm output shows `No changes`
+- [x] T010 [US1] Validate `modules/azure-resource-group/main.tf` locally: run `terragrunt validate` from `environments/dev/resource-group/` and resolve any HCL errors
+- [x] T011 [US1] Run `terragrunt plan` from `environments/dev/resource-group/` and verify the plan shows exactly 1 resource to add (`azurerm_resource_group.this`) with name `homeschoolio-dev-rg-main`, location `eastus`, and all four tags present
+- [x] T012 [US1] Run `terragrunt apply` from `environments/dev/resource-group/` and confirm the resource group appears in Azure
+- [x] T013 [US1] Verify idempotency: run `terragrunt plan` again from `environments/dev/resource-group/` and confirm output shows `No changes`
 
 **Checkpoint**: User Story 1 complete — `homeschoolio-dev-rg-main` exists in Azure, plan is clean, idempotency confirmed.
 
@@ -66,10 +66,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T014 [P] [US2] Run `terragrunt validate` from `environments/staging/resource-group/` and resolve any issues
-- [ ] T015 [P] [US2] Run `terragrunt validate` from `environments/production/resource-group/` and resolve any issues
-- [ ] T016 [US2] Run `terragrunt plan` from `environments/staging/resource-group/` and verify plan shows `homeschoolio-staging-rg-main` with `Environment = "staging"` tag — confirm no module code changes were required
-- [ ] T017 [US2] Run `terragrunt plan` from `environments/production/resource-group/` and verify plan shows `homeschoolio-production-rg-main` with `Environment = "production"` tag
+- [x] T014 [P] [US2] Run `terragrunt validate` from `environments/staging/resource-group/` and resolve any issues
+- [x] T015 [P] [US2] Run `terragrunt validate` from `environments/production/resource-group/` and resolve any issues
+- [x] T016 [US2] Run `terragrunt plan` from `environments/staging/resource-group/` and verify plan shows `homeschoolio-staging-rg-main` with `Environment = "staging"` tag — confirm no module code changes were required
+- [x] T017 [US2] Run `terragrunt plan` from `environments/production/resource-group/` and verify plan shows `homeschoolio-production-rg-main` with `Environment = "production"` tag
 
 **Checkpoint**: User Story 2 complete — all three environment plans are clean and show correct environment-scoped names and tags.
 
@@ -83,9 +83,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Re-apply dev environment if needed (`terragrunt apply` from `environments/dev/resource-group/`) to have a resource group to destroy
-- [ ] T019 [US3] Run `terragrunt destroy` from `environments/dev/resource-group/` and confirm the resource group is removed from Azure
-- [ ] T020 [US3] Re-apply dev environment after destroy test (`terragrunt apply` from `environments/dev/resource-group/`) to restore it for ongoing development
+- [x] T018 [US3] Re-apply dev environment if needed (`terragrunt apply` from `environments/dev/resource-group/`) to have a resource group to destroy
+- [x] T019 [US3] Run `terragrunt destroy` from `environments/dev/resource-group/` and confirm the resource group is removed from Azure
+- [x] T020 [US3] Re-apply dev environment after destroy test (`terragrunt apply` from `environments/dev/resource-group/`) to restore it for ongoing development
 
 **Checkpoint**: User Story 3 complete — destroy/re-create cycle confirmed in dev.
 

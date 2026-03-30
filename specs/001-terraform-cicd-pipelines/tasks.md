@@ -190,7 +190,7 @@ safety controls. Complete before any production release event is expected.
 - [x] T039 [P] Create `environments/{dev,staging,production}/infra/terragrunt.hcl` — concrete Terragrunt roots calling `modules/example`; include `root` via `find_in_parent_folders()`
 - [x] T040 [P] Flesh out `modules/example/` — add `variables.tf` (project, environment, location, owner), `main.tf` (azurerm_resource_group with all required tags), `outputs.tf` (resource_group_name, resource_group_id)
 - [x] T041 Remove `homeschoolio-shared-workflows/` local directory — all workflows already pushed to `jmckenzie17/homeschoolio-shared-actions` at `v1.2.0`; local copy was dead weight
-- [ ] T036 Run full `specs/001-terraform-cicd-pipelines/quickstart.md` validation checklist end-to-end; confirm all acceptance criteria pass
+- [x] T036 Run full `specs/001-terraform-cicd-pipelines/quickstart.md` validation checklist end-to-end; confirm all acceptance criteria pass
 
 ---
 
