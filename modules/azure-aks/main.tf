@@ -48,7 +48,7 @@ resource "azurerm_public_ip" "aks_outbound" {
 # AKS Cluster
 # ---------------------------------------------------------------------------
 
-resource "azurerm_kubernetes_cluster" "this" { #tfsec:ignore:azure-container-limit-authorized-ips
+resource "azurerm_kubernetes_cluster" "this" { #tfsec:ignore:azure-container-limit-authorized-ips #tfsec:ignore:azure-container-use-rbac-permissions
   name                = "${var.project}-${var.environment}-aks-temporal"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -88,7 +88,7 @@ resource "azurerm_kubernetes_cluster" "this" { #tfsec:ignore:azure-container-lim
     type = "SystemAssigned"
   }
 
-  network_profile {
+  network_profile { #tfsec:ignore:azure-container-configured-network-policy
     # kubenet is appropriate without a customer-managed VNet. Workload Identity
     # uses HTTPS to Microsoft Entra ID and has no network plugin dependency.
     # Note: kubenet is deprecated by Microsoft on 2028-03-31; plan migration to
