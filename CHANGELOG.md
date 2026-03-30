@@ -25,17 +25,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `key-vault` modules
 - Extended `policies/naming.rego` enforced_types with `azurerm_postgresql_flexible_server`,
   `azurerm_user_assigned_identity`, `azurerm_public_ip`
-
 - `modules/azure-resource-group` v1.0.0 — OpenTofu module that provisions a tagged Azure resource
   group (`{project}-{environment}-rg-main`) with required `Project`, `Environment`, `ManagedBy`,
   and `Owner` tags; satisfies OPA naming and tag policies
 - Terragrunt roots for `dev`, `staging`, and `production` environments under
   `environments/{env}/resource-group/`
+- `policies/README.md` — documents `tags.rego` and `naming.rego`: what each enforces, example
+  violations, passing examples, and local Conftest invocation
+
+### Changed
+
+- `ci.yml` — narrowed `plan` job `environments` input from `"dev,staging,production"` to `"dev"`;
+  aligns with dev-only CD scope (spec clarification 2026-03-30)
+- `cd.yml` — removed `staging-apply` and `production-apply` jobs; CD pipeline now targets `dev`
+  only; staging/production promotion deferred to a future feature
 
 ### Removed
 
 - `modules/example/` — CI/CD validation scaffold; superseded by `modules/azure-resource-group/`
 - `environments/{env}/infra/` Terragrunt roots that sourced the example module
+- `cd.yml` `workflow_dispatch` trigger block (staging/production manual promotion deferred)
 
 ---
 

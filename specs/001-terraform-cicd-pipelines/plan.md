@@ -1,49 +1,57 @@
 # Implementation Plan: OpenTofu/Terragrunt CI/CD Pipelines with Semantic Versioning
 
-**Branch**: `001-terraform-cicd-pipelines` | **Date**: 2026-03-27 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-terraform-cicd-pipelines` | **Date**: 2026-03-30 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/001-terraform-cicd-pipelines/spec.md`
 
 ## Summary
 
-Implement GitHub Actions CI/CD pipelines for OpenTofu 1.6.2 / Terragrunt 0.56.3 infrastructure,
-using reusable shared workflows pinned to semver tags from `jmckenzie17/homeschoolio-shared-actions`.
-CI runs on every PR (validate → plan → test → destructive-op gate). CD triggers on GitHub
-`release: published` events whose tag matches `v[0-9]+.[0-9]+.[0-9]+` (stable semver, non-draft,
-non-prerelease), applies all environment roots to `dev` automatically, and gates `staging`/`production`
-promotion behind manual triggers and GitHub environment protection rules. Three gaps in the existing
-workflows require remediation: missing CD tag filter, missing CD concurrency group, and `release.yml`
-pinned to `@main` instead of a semver tag.
+Implement GitHub Actions CI/CD pipelines for this OpenTofu/Terragrunt infrastructure
+repository. The CI pipeline runs on every PR (validate → plan → test → destructive-op
+gate). The CD pipeline triggers on push to `main`, runs `semantic-release` to create a
+semver Git tag/release, and automatically applies to the `dev` environment root when a
+release is created. Staging and production promotion are out of scope for this feature.
+All pipeline logic is sourced from reusable workflows in
+`jmckenzie17/homeschoolio-shared-actions`, pinned to a semver tag.
+
+**Current state**: Both `ci.yml` and `cd.yml` workflows already exist and are largely
+correct. The plan identifies gaps relative to the spec and delivers the delta work
+needed to reach full compliance.
 
 ## Technical Context
 
-**Language/Version**: HCL (OpenTofu 1.6.2) + Terragrunt 0.56.3 (pinned via `.opentofu-version` / `.terragrunt-version`)
-**Primary Dependencies**: `opentofu/setup-opentofu@v1`, `actions/cache@v4`, `jmckenzie17/homeschoolio-shared-actions@v1.3.2` (validate, plan, test, apply, semver-release shared workflows)
-**Storage**: Azure Storage Account `homeschooliostfstate` (eastus) — containers `homeschoolio-{env}-infra-tfstate` per Terragrunt root; Azure Blob lease locking
-**Testing**: OPA/Conftest (`policies/tags.rego`, `policies/naming.rego`), tfsec, Checkov — all run against plan JSON in the shared `test.yml` workflow; no live cloud environment required
-**Target Platform**: GitHub Actions (ubuntu-latest runners); Azure cloud (infra target)
-**Project Type**: IaC CI/CD pipeline configuration
-**Performance Goals**: CI pipeline completes within 5 minutes of PR event (SC-001); `dev` apply completes within 5 minutes of release event (US3 acceptance scenario 1)
-**Constraints**: No external notification channels (GitHub native only); no Infracost; lowest-cost Azure SKUs; shared workflow logic must not be duplicated inline
-**Scale/Scope**: 3 environment tiers × 1 domain root (expandable); 1 repo; shared workflows from external pinned repo
+**Language/Version**: HCL (OpenTofu 1.6.2, pinned via `.opentofu-version`); Terragrunt
+0.56.3 (pinned via `.terragrunt-version`); YAML (GitHub Actions workflow syntax)
+**Primary Dependencies**: `jmckenzie17/homeschoolio-shared-actions` (shared reusable
+workflows) pinned at `v1.3.6`; `actions/github-script@v8`; AzureRM provider `~> 3.0`;
+`semantic-release` (invoked by shared semver-release workflow)
+**Storage**: Azure Blob Storage (`homeschooliostfstate`, `eastus`) — remote state
+backend; `homeschoolio-dev-infra-tfstate` container for `dev` environment root
+**Testing**: OPA/Conftest (policies under `policies/`), tfsec, Checkov — all invoked by
+the shared `test.yml` workflow; plan JSON artifact passed as input
+**Target Platform**: GitHub Actions runners (ubuntu-latest); Azure (eastus)
+**Project Type**: Infrastructure-as-code CI/CD pipeline (YAML + HCL)
+**Performance Goals**: CI completes within 5 minutes of PR trigger (SC-001); CD applies
+to `dev` within 5 minutes of merge (US3 independent test)
+**Constraints**: OIDC/Workload Identity auth only (no long-lived service principal
+secrets); `GITHUB_TOKEN` cannot trigger downstream workflow runs (GitHub security
+restriction — mitigated by single `cd.yml` combining release + apply jobs)
+**Scale/Scope**: 1 environment root in scope (`environments/dev/infra`); 1 module
+(`modules/example`); 3 policy files (`policies/tags.rego`, `policies/naming.rego`)
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-checked after Phase 1 design.*
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Infrastructure as Code | PASS | All resources in HCL; no manual changes; secrets via Key Vault data sources (out of scope for this feature but assumed) |
-| II. Environment Parity & Promotion | PASS | `dev → staging → production` enforced via `needs:` and `if:` conditions in `cd.yml`; no skip path exists |
-| III. Immutable Versioning | **VIOLATION** (justified) | `release.yml` currently pins to `@main` — remediation is a task in this plan (T-fix-release-pin). No other floating refs. |
-| IV. Plan Before Apply | PASS | CI generates and publishes plan before any apply; apply jobs in shared `apply.yml` require plan output |
-| V. State Isolation & Locking | PASS | Per-environment Blob containers with lease locking; versioning on storage account (assumed by constitution) |
-| VI. Cost Consciousness & Observability | PASS | No Infracost; audit logs traceable to commit SHA (FR-013); policy-as-code blocks HIGH/CRITICAL findings |
+| I. Infrastructure as Code | PASS | All resources in HCL; Terragrunt DRY wrappers; no manual changes |
+| II. Environment Parity & Promotion | SCOPED — dev only | Staging/production promotion explicitly deferred to future feature per spec clarification 2026-03-30; `dev` environment root has its own state container; no tier-skipping is possible with dev-only scope |
+| III. Immutable Versioning | PASS | Shared workflows pinned to `v1.3.6`; modules use `MAJOR.MINOR.PATCH`; semantic-release drives tagging |
+| IV. Plan Before Apply | PASS | CI generates `terragrunt plan` artifact on every PR; plan reviewed before merge; destructive-op gate enforced |
+| V. State Isolation & Locking | PASS | Azure Blob backend per environment root; Azure lease locking; no local state |
+| VI. Cost Consciousness & Observability | PASS | All pipeline runs traceable to commit SHA; OPA/Checkov/tfsec in CI; no extra-cost tooling added |
 
-## Complexity Tracking
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|--------------------------------------|
-| Constitution III: `release.yml@main` | Existing code pre-dates the spec's pin requirement; must be remediated | Keeping `@main` is a supply-chain risk and constitution violation; fix is a one-line change |
+**Constitution gate: PASS** (Principle II scoping is explicitly justified in spec.)
 
 ## Project Structure
 
@@ -51,192 +59,187 @@ pinned to `@main` instead of a semver tag.
 
 ```text
 specs/001-terraform-cicd-pipelines/
-├── plan.md              ← this file
-├── research.md          ← Phase 0 output (existing + updated)
-├── data-model.md        ← Phase 1 output (existing)
-├── quickstart.md        ← Phase 1 output (existing + updated)
-├── contracts/           ← Phase 1 output (workflow interface contracts)
-└── tasks.md             ← Phase 2 output (/speckit.tasks)
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command)
+├── data-model.md        # Phase 1 output (/speckit.plan command)
+├── quickstart.md        # Phase 1 output (/speckit.plan command)
+└── tasks.md             # Phase 2 output (/speckit.tasks command)
 ```
+
+No `contracts/` directory — this feature produces no public API, library interface, or
+external-facing schema. Workflow YAML files are internal CI/CD configuration, not
+contracts consumed by other systems.
 
 ### Source Code (repository root)
 
 ```text
 .github/
 └── workflows/
-    ├── ci.yml                    # PR + post-merge CI (validate → plan → test → destructive-op gate)
-    ├── cd.yml                    # Release-triggered CD (dev auto; staging/prod manual dispatch)
-    └── release.yml               # Semver release (push to main → semantic-release shared workflow)
+    ├── ci.yml           # PR pipeline: validate → plan → test → destructive-op gate
+    └── cd.yml           # Push-to-main pipeline: release + dev-apply jobs
 
 environments/
-├── dev/
-│   ├── terragrunt.hcl            # Environment-level locals
-│   └── infra/
-│       └── terragrunt.hcl        # Domain root: inherits root + env HCL, sources module
-├── staging/
-│   └── infra/
-│       └── terragrunt.hcl
-└── production/
+└── dev/
     └── infra/
-        └── terragrunt.hcl
+        └── terragrunt.hcl  # Dev environment root (only root targeted by CD)
 
 modules/
-└── example/
+└── example/             # Deployed to dev; used to validate pipeline end-to-end
     ├── main.tf
     ├── variables.tf
     ├── outputs.tf
-    └── version.tf                # locals { module_version = "MAJOR.MINOR.PATCH" }
+    └── version.tf
 
 policies/
-├── tags.rego                     # OPA: required tag compliance
-└── naming.rego                   # OPA: resource naming convention
+├── tags.rego            # OPA: required tags (Project, Environment, ManagedBy, Owner)
+└── naming.rego          # OPA: {project}-{environment}-{type}-{descriptor} pattern
 
-terragrunt.hcl                    # Root: remote_state backend generation + common inputs
-.opentofu-version                 # Pins OpenTofu 1.6.2
-.terragrunt-version               # Pins Terragrunt 0.56.3
+.opentofu-version        # Pins OpenTofu 1.6.2
+.terragrunt-version      # Pins Terragrunt 0.56.3
 ```
 
-**Structure Decision**: Single-project IaC layout. No `src/` or `backend/` split — HCL files
-ARE the source. The `.github/workflows/` directory contains thin caller workflows; all pipeline
-logic lives in shared workflows referenced via `uses:`.
+**Structure Decision**: Single flat layout with workflow YAML at `.github/workflows/`,
+IaC source under `environments/` and `modules/`, policies under `policies/`. No
+src/tests directories — this is a pure IaC + CI/CD pipeline feature, not an application.
 
----
+## Complexity Tracking
 
-## Phase 0: Research Summary
+No constitution violations requiring justification. Principle II scoping (dev-only) is
+explicitly permitted by the spec clarification recorded 2026-03-30 and does not
+constitute a violation — the principle's "no skipping" constraint is trivially satisfied
+when only one tier is in scope.
 
-*All NEEDS CLARIFICATION items resolved. See [research.md](research.md) for full findings.*
+## Gap Analysis: Existing Workflows vs. Spec
 
-| Unknown | Resolution |
-|---------|------------|
-| CD tag filter mechanism | `if:` condition on jobs: `startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-') && github.event.release.prerelease == false` |
-| Concurrency group key for CD | Static key `cd-deployment`; `cancel-in-progress: false`; GitHub enforces max 1 pending run |
-| `release.yml@main` risk | Supply-chain risk + constitution III violation; pin to `@v1.3.2` |
-| Draft vs. published filter | `on.release: published` + `github.event.release.prerelease == false`; `semantic-release` creates non-draft by default |
-| CD scope on release | Apply all environment roots unconditionally (no changed-files filtering) |
-| Supersession behavior | New release overwrites `dev`; no expiry or gate blocking subsequent runs |
+### ci.yml — current state vs. spec
 
----
+| FR | Requirement | Current State | Gap |
+|----|-------------|---------------|-----|
+| FR-001 | Trigger on PR open/update/reopen to main only | `on: pull_request: branches: [main]` | COMPLIANT |
+| FR-002 | Validate all Terragrunt roots | `validate` job via shared workflow | COMPLIANT |
+| FR-003 | Run infrastructure tests (OPA, Checkov, tfsec) | `test` job via shared workflow | COMPLIANT |
+| FR-004 | Generate plan and publish as PR artifact | `plan` job with `environments: "dev,staging,production"` | GAP: should be `"dev"` only per clarification |
+| FR-005 | Block merge on failure | GitHub branch protection + required checks | COMPLIANT (requires branch protection config) |
+| FR-006 | Destructive-op gate | `destructive-op-gate` job | COMPLIANT |
+| FR-013 | Traceable to commit SHA and PR | Implicit in GitHub Actions context | COMPLIANT |
+| FR-014 | Notifications via GitHub native only | No external integrations | COMPLIANT |
 
-## Phase 1: Design & Contracts
+**CI gap**: `plan` job targets `environments: "dev,staging,production"` — should be `"dev"` only.
 
-### Workflow Interface Contracts
+### cd.yml — current state vs. spec
 
-Three caller workflows in `.github/workflows/` — each is a thin shell that passes inputs/secrets
-to shared workflows. Contracts are defined in [contracts/](contracts/).
+| FR | Requirement | Current State | Gap |
+|----|-------------|---------------|-----|
+| FR-007 | Trigger on push to main; release + dev-apply in single workflow | `on: push: branches: [main]` + combined jobs | COMPLIANT |
+| FR-007a | Queue concurrent runs (`cancel-in-progress: false`) | `concurrency: group: cd-deployment, cancel-in-progress: false` | COMPLIANT |
+| FR-007b | Target dev root only | `dev-apply` targets `dev`; but `staging-apply` and `production-apply` jobs exist | GAP: staging/production jobs must be removed |
+| FR-008 | Staging promotion out of scope | `staging-apply` job exists | GAP: remove `staging-apply` job |
+| FR-009 | Production promotion out of scope | `production-apply` job exists | GAP: remove `production-apply` job |
+| FR-010 | Semver tagging via shared workflow | `release` job via `semver-release.yml@v1.3.6` | COMPLIANT |
+| FR-011 | All logic sourced from shared workflows at pinned tag | All `uses:` pinned to `v1.3.6` | COMPLIANT |
 
-#### `ci.yml` — Trigger contract
+**CD gaps**:
+1. `workflow_dispatch` input for staging/production promotion must be removed.
+2. `staging-apply` and `production-apply` jobs must be removed.
+3. `dev-apply` `if:` condition references `needs.release` — verify it remains correct after removing downstream jobs.
 
-```
-Trigger:
-  - pull_request: [opened, synchronize, reopened] → branches: [main]
-  - push: branches: [main]
+### Branch Protection / GitHub Settings (out-of-band)
 
-Concurrency: ci-${{ github.ref }}, cancel-in-progress: true
+The following must be configured in GitHub repository settings (not in YAML files):
 
-Jobs (in dependency order):
-  validate  → shared: validate.yml@v1.3.2
-  plan      → needs: [validate]; shared: plan.yml@v1.3.2; inputs: environments="dev,staging,production"
-  test      → needs: [validate, plan]; shared: test.yml@v1.3.2; inputs: plan-json-artifact
-  destructive-op-gate → needs: [plan]; inline job (no shared workflow)
-    condition: plan.outputs.has-destructive-ops == 'true' && event == pull_request
-    action: actions/github-script@v8 — checks PR body for acknowledgment checkbox
-```
+- Branch protection rule on `main`: require status checks `Validate`, `Plan`, `Test`,
+  `Destructive Operation Gate` (when applicable).
+- Require PR before merging, require approvals ≥ 1.
+- These are administrative settings, not implementable via workflow YAML.
 
-#### `cd.yml` — Trigger contract (including all clarification fixes)
+## Phase 0: Research
 
-```
-Trigger:
-  - release: [published]
-  - workflow_dispatch: inputs: target-environment (choice: staging | production)
+See [research.md](research.md) for full findings. Key decisions:
 
-Concurrency: cd-deployment, cancel-in-progress: false   ← NEW (FR-007a)
+| Decision | Rationale |
+|----------|-----------|
+| Single `cd.yml` (release + dev-apply combined) | Avoids `GITHUB_TOKEN` downstream event restriction; no PAT or additional token needed |
+| Pin shared workflows to `v1.3.6` | Already established; upgrade via explicit PR per FR-011 |
+| OPA/Conftest for policy-as-code | Already in place (`policies/` directory with `tags.rego`, `naming.rego`); shared `test.yml` consumes plan JSON artifact |
+| `environments: "dev"` in CI plan job | Narrows plan scope to dev root; aligns with clarification that staging/production are out of scope |
+| Queue CD runs (`cancel-in-progress: false`) | Ensures no release is silently dropped; matches FR-007a and clarification answer |
+| OIDC Workload Identity auth | Secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` already in repo; no long-lived credentials |
 
-Jobs:
-  dev-apply
-    condition: github.event_name == 'release'
-              && startsWith(github.ref_name, 'v')
-              && !contains(github.ref_name, '-')
-              && github.event.release.prerelease == false    ← NEW (FR-007)
-    shared: apply.yml@v1.3.2; with: target-environment=dev
-
-  staging-apply
-    needs: [dev-apply]; condition: manual dispatch for staging OR dev-apply succeeded
-    shared: apply.yml@v1.3.2; with: target-environment=staging
-
-  production-apply
-    needs: [staging-apply]; condition: manual dispatch for production AND staging succeeded
-    shared: apply.yml@v1.3.2; with: target-environment=production
-```
-
-#### `release.yml` — Trigger contract (remediation)
-
-```
-Trigger: push: branches: [main]
-
-Jobs:
-  semver-release
-    shared: semver-release.yml@v1.3.2   ← FIX: was @main (FR-011, constitution III)
-    inputs: release-branch=main, tag-prefix="v"
-    secrets: inherit
-```
+## Phase 1: Design
 
 ### Data Model
 
-See [data-model.md](data-model.md) — no changes required from Phase 0 clarifications.
+See [data-model.md](data-model.md) for full entity definitions. Summary:
 
-### Key Design Decisions
+| Entity | Source of Truth | Notes |
+|--------|----------------|-------|
+| Pipeline Run | GitHub Actions run | Tied to commit SHA, PR number, branch, outcome |
+| Environment Root | `environments/dev/infra/terragrunt.hcl` | Only `dev` root in scope |
+| Module Version | `modules/example/version.tf` (`module_version = "1.0.0"`) | Semantic version string; updated via conventional commits |
+| Plan Artifact | GitHub Actions artifact (`tfplan-json-{run_id}`) | JSON plan output; passed to `test.yml` |
+| Shared Workflow | `jmckenzie17/homeschoolio-shared-actions@v1.3.6` | Pinned reusable workflows |
+| Git Tag / Release | GitHub release created by `semver-release.yml` | Format `v{MAJOR.MINOR.PATCH}`; floating `v{MAJOR}` pointer |
 
-1. **Tag filter `if:` condition placement**: Applied to the `dev-apply` job (the only release-triggered
-   job). `staging-apply` and `production-apply` use `workflow_dispatch` and are never triggered directly
-   by a release event, so they do not need the same filter.
+### Interface Contracts
 
-2. **`github.event.release.prerelease` vs. tag `-` check**: Use both. `startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-')` handles the tag pattern; `github.event.release.prerelease == false` handles the GitHub release metadata. Belt-and-suspenders approach costs nothing.
+No external contracts — this feature produces GitHub Actions workflow YAML and Terragrunt
+HCL configuration. These are internal CI/CD pipeline definitions consumed only by GitHub
+Actions runners and the Terragrunt CLI. No public API surface is exposed.
 
-3. **Concurrency group is static `cd-deployment`**: A release always has a unique `github.ref`
-   (e.g., `refs/tags/v1.2.3`), so using `${{ github.ref }}` as the group key would allow
-   unlimited concurrent deployments. A static key ensures only one CD run is active at a time.
+The shared workflow interface (inputs/outputs/secrets) is owned by
+`jmckenzie17/homeschoolio-shared-actions` and documented in [research.md](research.md).
 
-4. **All roots applied unconditionally**: The CD apply.yml shared workflow runs `terragrunt run-all apply`
-   across all environment roots. No changed-files filtering in CD — every release represents full desired
-   state. No-op roots (no diff) complete quickly and do not block the run.
+### Concrete Changes Required
 
-5. **`release.yml` pin fix**: One-line change from `@main` to `@v1.3.2`. No functional change; pure
-   supply-chain and constitution compliance fix.
+#### 1. `.github/workflows/ci.yml` — change `environments` input
 
----
+```yaml
+# Before
+  plan:
+    with:
+      environments: "dev,staging,production"
 
-## Agent Context Update
-
-Run after Phase 1 artifacts are complete:
-
-```bash
-.specify/scripts/bash/update-agent-context.sh claude
+# After
+  plan:
+    with:
+      environments: "dev"
 ```
 
-New technology to add to agent context:
-- GitHub Actions `on.release: published` event with job-level `if:` tag filter
-- GitHub Actions `concurrency:` with static group key and `cancel-in-progress: false`
-- `semantic-release` via `jmckenzie17/homeschoolio-shared-actions/semver-release.yml`
+#### 2. `.github/workflows/cd.yml` — remove staging/production jobs and dispatch input
 
----
+Remove:
+- `workflow_dispatch` trigger block (entire `inputs:` section, or entire `workflow_dispatch:` key)
+- `staging-apply` job
+- `production-apply` job
 
-## Post-Phase 1 Constitution Check
+Retain:
+- `on: push: branches: [main]`
+- `permissions`
+- `concurrency` group (unchanged)
+- `release` job (unchanged)
+- `dev-apply` job (unchanged — already correctly targets `dev` and gates on `needs.release.outputs.release-created == 'true'`)
 
-All gates pass after design decisions above:
-- Principle III violation (release.yml@main) has a concrete remediation task (not deferred)
-- No new floating refs introduced
-- CD concurrency design eliminates parallel-apply risk (Principle V: state locking)
-- All apply jobs gated behind plan (Principle IV)
-- Environment promotion order enforced (Principle II)
+#### 3. Branch Protection (GitHub UI — not a workflow change)
 
----
+Configure on `main`:
+- Required status checks: `Validate`, `Plan`, `Test`, `Destructive Operation Gate`
+- Require PR before merge
+- Require at least 1 approval
+- Do not allow bypassing required checks
 
-## Artifacts Generated
+### Quickstart
 
-| File | Status |
-|------|--------|
-| `research.md` | Updated with new decisions (CD trigger filter, concurrency, pin fix) |
-| `data-model.md` | Existing — no changes required |
-| `quickstart.md` | Updated — removed stale `@main` note; added CD trigger filter validation step |
-| `contracts/` | New — workflow interface contracts (ci.yml, cd.yml, release.yml) |
-| `plan.md` | This file |
+See [quickstart.md](quickstart.md) for developer onboarding guide.
+
+## Post-Design Constitution Re-Check
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. IaC | PASS | No drift; all resources managed in HCL |
+| II. Environment Parity | SCOPED (justified) | Dev-only scope is explicit and justified |
+| III. Immutable Versioning | PASS | `v1.3.6` pin unchanged; semantic-release drives tags |
+| IV. Plan Before Apply | PASS | CI generates plan on every PR; destructive-op gate in place |
+| V. State Isolation | PASS | `homeschoolio-dev-infra-tfstate` container; Azure Blob locking |
+| VI. Observability | PASS | All runs traceable to SHA; OPA/Checkov/tfsec block HIGH findings |
+
+**Post-design gate: PASS**

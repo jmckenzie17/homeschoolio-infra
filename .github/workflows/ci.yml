@@ -31,7 +31,7 @@ jobs:
     needs: validate
     uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.4.7
     with:
-      environments: "dev,staging,production"
+      environments: "dev"
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
