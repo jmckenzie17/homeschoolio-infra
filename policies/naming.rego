@@ -21,6 +21,9 @@ enforced_types := {
   "azurerm_linux_virtual_machine",
   "azurerm_app_service",
   "azurerm_function_app",
+  "azurerm_postgresql_flexible_server",
+  "azurerm_user_assigned_identity",
+  "azurerm_public_ip",
 }
 
 deny contains msg if {

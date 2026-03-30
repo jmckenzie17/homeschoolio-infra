@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     
 permissions:
   id-token: write
@@ -17,19 +17,19 @@ concurrency:
 
 # Shared workflow version — update the version in each uses: line below to upgrade.
 # Note: GitHub Actions does not support env vars in uses: fields; version must be literal.
-# Current pinned version: v1.3.16
+# Current pinned version: v1.4.7
 
 jobs:
   validate:
     name: Validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.3.16
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/validate.yml@v1.4.7
     secrets:
       backend-credentials: ${{ secrets.AZURE_CLIENT_ID }}
 
   plan:
     name: Plan
     needs: validate
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.3.16
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/plan.yml@v1.4.7
     with:
       environments: "dev,staging,production"
     secrets:
@@ -41,7 +41,7 @@ jobs:
   test:
     name: Test
     needs: [validate, plan]
-    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.3.16
+    uses: jmckenzie17/homeschoolio-shared-actions/.github/workflows/test.yml@v1.4.7
     with:
       plan-json-artifact: tfplan-json-${{ github.run_id }}
     secrets:

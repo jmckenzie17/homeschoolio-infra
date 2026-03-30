@@ -71,6 +71,61 @@ The CI/CD pipeline runs `semantic-release` on every merge to `main`. It:
 
 No tag is created for `chore:`, `docs:`, `style:`, `refactor:`, or `test:` commits alone.
 
+## Pre-Deployment Checklist: Feature 003 (Azure Temporal Infrastructure)
+
+Before running `terragrunt apply` for the first time in any environment, complete the following steps:
+
+### 1. Set `api_server_authorized_ip_ranges`
+
+Before applying the AKS module, set your operator CIDR in `environments/<env>/aks/terragrunt.hcl`:
+
+```hcl
+api_server_authorized_ip_ranges = ["<your-public-ip>/32"]
+```
+
+The placeholder value `["0.0.0.0/0"]` allows all sources and is not appropriate for production.
+To find your current public IP: `curl -s https://checkip.amazonaws.com`
+
+### 2. Set Required Environment Variables
+
+```bash
+# PostgreSQL administrator password (required by postgresql and key-vault modules)
+export TF_VAR_pg_admin_password="<secure-random-password>"
+```
+
+### 3. Confirm ESO ServiceAccount Coordinates
+
+The AKS module's federated identity credential subject is:
+```
+system:serviceaccount:<eso_namespace>:<eso_service_account_name>
+```
+Defaults: `external-secrets` / `external-secrets`.
+
+If the External Secrets Operator deployment uses different values, override in the environment's
+`aks/terragrunt.hcl` `inputs` block before applying.
+
+### 4. Apply Order
+
+Apply modules in this order (Terragrunt resolves automatically with `run-all apply`):
+
+```
+1. resource-group  (existing — no change required)
+2. aks             (produces outbound IP and ESO UAMI outputs)
+3. postgresql + key-vault  (parallel — both depend only on aks outputs)
+```
+
+### 5. Key Vault Immutable Settings
+
+The following settings are **immutable after first apply** — verify before provisioning:
+
+| Environment | `purge_protection_enabled` | `soft_delete_retention_days` |
+|-------------|---------------------------|------------------------------|
+| dev         | `false`                   | `7`                          |
+| staging     | `true`                    | `90`                         |
+| production  | `true`                    | `90`                         |
+
+---
+
 ### Pull Request Guidelines
 
 - PR title should follow the same conventional commit format
