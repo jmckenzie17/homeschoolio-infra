@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-30
 - Azure Blob Storage (`homeschooliostfstate`) — remote state backend; no application storage (002-azure-resource-group)
 - HCL (OpenTofu 1.6.2, pinned via `.opentofu-version`) + Terragrunt 0.56.3 (pinned via `.terragrunt-version`); AzureRM provider `~> 3.0` (≥ 3.28 required for `workload_identity_enabled`, ≥ 3.27 required for `public_network_access_enabled`) (003-azure-temporal-infra)
 - Azure Blob Storage (`homeschooliostfstate`) — remote state only; PostgreSQL Flexible Server — Temporal workflow state; public endpoints with IP-based access restriction (003-azure-temporal-infra)
+- YAML (GitHub Actions workflow syntax) + `opentofu/setup-opentofu@v1`, `hashicorp/setup-terraform` or Terragrunt binary install; existing secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `TF_VAR_PG_ADMIN_PASSWORD` (004-terraform-destroy-workflow)
+- Azure Blob Storage (`homeschooliostfstate`) — remote state backend, no new storage (004-terraform-destroy-workflow)
 
 - HCL (OpenTofu ≥ 1.6) + Terragrunt ≥ 0.56 + `opentofu/setup-opentofu@v1`, `actions/cache@v4`, (001-terraform-cicd-pipelines)
 
@@ -34,6 +36,7 @@ tests/
 HCL (OpenTofu ≥ 1.6) + Terragrunt ≥ 0.56: Follow standard conventions
 
 ## Recent Changes
+- 004-terraform-destroy-workflow: Added YAML (GitHub Actions workflow syntax) + `opentofu/setup-opentofu@v1`, `hashicorp/setup-terraform` or Terragrunt binary install; existing secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `TF_VAR_PG_ADMIN_PASSWORD`
 - 003-azure-temporal-infra: Added public AKS cluster (`authorized_ip_ranges`, static outbound IP, kubenet, Workload Identity), PostgreSQL Flexible Server (public endpoint, AKS outbound IP firewall rule, Temporal databases), Key Vault (RBAC mode, public endpoint, PostgreSQL credentials); removed VNet, VPN Gateway, and private endpoint architecture
 
 
