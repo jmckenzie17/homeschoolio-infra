@@ -33,7 +33,7 @@ locals {
 # ---------------------------------------------------------------------------
 
 resource "azurerm_postgresql_flexible_server" "this" {
-  name                = "${var.project}-${var.environment}-psql-temporal"
+  name                = "${var.project}-${var.environment}-psql-temporal-01"
   resource_group_name = var.resource_group_name
   location            = var.location
 
