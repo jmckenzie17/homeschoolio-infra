@@ -95,10 +95,10 @@
 
 **Purpose**: Static analysis validation, CI verification, and documentation hygiene.
 
-- [ ] T021 [P] Run `tfsec modules/azure-resource-group/` and resolve any HIGH/CRITICAL findings (constitution Principle VI gate)
-- [ ] T022 [P] Run `checkov -d modules/azure-resource-group/` and resolve any HIGH/CRITICAL findings
-- [ ] T023 Run Conftest OPA policy checks: generate a plan JSON from `environments/dev/resource-group/` and run `conftest test` against `policies/` — verify zero naming and tags violations
-- [ ] T024 Verify CI pipeline runs successfully on the feature branch PR (validate, plan, policy scan gates all pass)
+- [x] T021 [P] Run `tfsec modules/azure-resource-group/` and resolve any HIGH/CRITICAL findings (constitution Principle VI gate)
+- [x] T022 [P] Run `checkov -d modules/azure-resource-group/` and resolve any HIGH/CRITICAL findings
+- [x] T023 Run Conftest OPA policy checks: generate a plan JSON from `environments/dev/resource-group/` and run `conftest test` against `policies/` — verify zero naming and tags violations
+- [x] T024 Verify CI pipeline runs successfully on the feature branch PR (validate, plan, policy scan gates all pass)
 - [x] T025 [P] Update `specs/002-azure-resource-group/spec.md` to correct tag casing (`ManagedBy`, `Project`, `Environment`, `Owner`) and resource name pattern (`homeschoolio-{env}-rg-main`) across FR-001, FR-003, Key Entities, and Assumptions — resolved by `/speckit.specify 002` on 2026-03-27
 
 ---
