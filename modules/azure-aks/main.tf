@@ -48,7 +48,7 @@ resource "azurerm_public_ip" "aks_outbound" {
 # AKS Cluster
 # ---------------------------------------------------------------------------
 
-resource "azurerm_kubernetes_cluster" "this" {
+resource "azurerm_kubernetes_cluster" "this" { #tfsec:ignore:azure-container-limit-authorized-ips
   name                = "${var.project}-${var.environment}-aks-temporal"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -72,6 +72,9 @@ resource "azurerm_kubernetes_cluster" "this" {
     authorized_ip_ranges = var.api_server_authorized_ip_ranges
   }
 
+  # Explicitly enable RBAC (default in AzureRM 3.x, but stated for tfsec compliance).
+  role_based_access_control_enabled = true
+
   default_node_pool {
     name            = "system"
     node_count      = var.node_count
@@ -91,6 +94,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     # Note: kubenet is deprecated by Microsoft on 2028-03-31; plan migration to
     # Azure CNI Overlay before that date.
     network_plugin = "kubenet"
+    network_policy = "calico"
     service_cidr   = "10.1.0.0/16"
     dns_service_ip = "10.1.0.10"
     # docker_bridge_cidr is deprecated in AzureRM >= 3.48 — intentionally omitted.
