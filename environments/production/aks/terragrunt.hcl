@@ -11,7 +11,7 @@ terraform {
 
 dependency "resource_group" {
   config_path = "../resource-group"
-  mock_outputs_allowed_terraform_commands  = ["plan"]
+  mock_outputs_allowed_terraform_commands  = ["init", "plan"]
   mock_outputs_merge_strategy_with_state   = "shallow"
   mock_outputs = {
     resource_group_name = "mock-resource-group"
